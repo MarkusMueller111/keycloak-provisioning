@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import de.cronn.commons.lang.StreamUtil;
+import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
@@ -48,8 +49,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Administers a single Keycloak realm reached through a caller-supplied connection. Does not create
- * or own the connection.
+ * Administers a single Keycloak realm reached through a caller-supplied {@link
+ * KeycloakConnectionManager}. Does not create or own the connection.
  */
 public class RealmManager {
 
@@ -62,8 +63,9 @@ public class RealmManager {
   private final SystemClientNaming clientNaming;
 
   /**
-   * Usually obtained from a connection manager, which supplies the naming it was configured with;
-   * construct one directly only when managing the {@link Keycloak} connection yourself.
+   * Usually obtained via {@link KeycloakConnectionManager#realmManager(String)}, which supplies the
+   * naming it was configured with; construct one directly only when managing the {@link Keycloak}
+   * connection yourself.
    */
   public RealmManager(Keycloak keycloak, String realmName, SystemClientNaming clientNaming) {
     this.keycloak = Objects.requireNonNull(keycloak);
