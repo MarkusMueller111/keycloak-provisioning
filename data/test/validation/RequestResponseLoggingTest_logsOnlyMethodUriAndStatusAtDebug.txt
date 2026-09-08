@@ -1,0 +1,4 @@
+GET [KEYCLOAK_URL]/admin/realms/test/clients
+GET [KEYCLOAK_URL]/admin/realms/test/clients -> 200
+POST [KEYCLOAK_URL]/admin/realms/test/clients
+POST [KEYCLOAK_URL]/admin/realms/test/clients -> 201

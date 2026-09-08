@@ -1,0 +1,59 @@
+[ {
+  "attributes" : null,
+  "clientRole" : false,
+  "composite" : true,
+  "composites" : {
+    "application" : null,
+    "client" : null,
+    "realm" : [ "create-realm" ]
+  },
+  "containerId" : "[containerId]",
+  "description" : "${role_admin}",
+  "id" : "[id]",
+  "name" : "admin",
+  "scopeParamRequired" : null
+}, {
+  "attributes" : null,
+  "clientRole" : false,
+  "composite" : false,
+  "composites" : null,
+  "containerId" : "[containerId]",
+  "description" : "${role_create-realm}",
+  "id" : "[id]",
+  "name" : "create-realm",
+  "scopeParamRequired" : null
+}, {
+  "attributes" : null,
+  "clientRole" : false,
+  "composite" : true,
+  "composites" : {
+    "application" : null,
+    "client" : null,
+    "realm" : [ "offline_access", "uma_authorization" ]
+  },
+  "containerId" : "[containerId]",
+  "description" : "${role_default-roles}",
+  "id" : "[id]",
+  "name" : "default-roles-master",
+  "scopeParamRequired" : null
+}, {
+  "attributes" : null,
+  "clientRole" : false,
+  "composite" : false,
+  "composites" : null,
+  "containerId" : "[containerId]",
+  "description" : "${role_offline-access}",
+  "id" : "[id]",
+  "name" : "offline_access",
+  "scopeParamRequired" : null
+}, {
+  "attributes" : null,
+  "clientRole" : false,
+  "composite" : false,
+  "composites" : null,
+  "containerId" : "[containerId]",
+  "description" : "${role_uma_authorization}",
+  "id" : "[id]",
+  "name" : "uma_authorization",
+  "scopeParamRequired" : null
+} ]

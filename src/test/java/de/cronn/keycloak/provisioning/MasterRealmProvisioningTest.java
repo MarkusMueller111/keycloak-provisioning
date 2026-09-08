@@ -1,0 +1,144 @@
+package de.cronn.keycloak.provisioning;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
+import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
+import de.cronn.keycloak.provisioning.master.MasterRealmProvisioner;
+import de.cronn.keycloak.provisioning.master.PermanentAdmin;
+import java.util.List;
+import java.util.function.Consumer;
+import org.junit.jupiter.api.Test;
+import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
+
+/**
+ * Hardening master cannot be undone, so every test here gets its own Keycloak. The frontend URL has
+ * to stay the container's own address, since it becomes the token issuer.
+ */
+class MasterRealmProvisioningTest extends OwnKeycloakTest {
+
+  @Test
+  void provisionsTheMasterRealm() {
+    provision(configBuilder(PermanentAdmin.none()).build());
+
+    withMaster(this::validateUpdatableKeycloakConfiguration);
+  }
+
+  /**
+   * The account clients stay enabled: the account console needs both, and an admin-triggered
+   * credential reset fails with "Client is not enabled" without them. Only the standard flow on
+   * 'account' is turned off.
+   */
+  @Test
+  void disablesBrokerButKeepsTheAccountClients() {
+    provision(configBuilder(PermanentAdmin.none()).build());
+
+    assertThat(masterClient("broker").isEnabled()).isFalse();
+    assertThat(masterClient("account-console").isEnabled()).isTrue();
+
+    ClientRepresentation account = masterClient("account");
+    assertThat(account.isEnabled()).isTrue();
+    assertThat(account.isStandardFlowEnabled()).isFalse();
+  }
+
+  @Test
+  void disablesTheAccountClientWhenItIsExplicitlyListed() {
+    provision(
+        configBuilder(PermanentAdmin.none())
+            .addDisabledClientIds(List.of("account", "account-console"))
+            .build());
+
+    assertThat(masterClient("account").isEnabled()).isFalse();
+    assertThat(masterClient("account-console").isEnabled()).isFalse();
+  }
+
+  @Test
+  void createsThePermanentAdminOnceAndLeavesItUntouchedOnReRun() {
+    String username = "permanent-admin";
+    provision(
+        configBuilder(
+                new PermanentAdmin.Standard(username, "Str0ng-P4ssw0rd!", "admin@example.com"))
+            .build());
+
+    UserRepresentation created = masterUser(username);
+    assertThat(realmRoleNames(created)).contains(RealmManager.ADMIN_REALM_ROLE);
+
+    provision(
+        configBuilder(
+                new PermanentAdmin.Standard(username, "Different-P4ssw0rd!", "new@example.com"))
+            .build());
+
+    assertThat(masterUser(username).getId()).isEqualTo(created.getId());
+    assertThat(masterUser(username).getEmail()).isEqualTo(created.getEmail());
+  }
+
+  @Test
+  void permanentAdminNoneCreatesNoUser() {
+    long usersBefore = masterUserCount();
+
+    provision(configBuilder(PermanentAdmin.none()).build());
+
+    assertThat(masterUserCount()).isEqualTo(usersBefore);
+  }
+
+  /**
+   * Keeps the bootstrap admin usable for the assertions: deleting the temporary admins or disabling
+   * admin-cli would cut off the only way back in.
+   */
+  private MasterRealmConfig.Builder configBuilder(PermanentAdmin permanentAdmin) {
+    return MasterRealmConfig.builder(serverUrl(), permanentAdmin)
+        .deleteTemporaryAdminUsers(false)
+        .disableAdminCliClient(false);
+  }
+
+  private void provision(MasterRealmConfig config) {
+    giveBootstrapAdminAnEmail();
+    withMaster(realmManager -> new MasterRealmProvisioner(realmManager, config).provision());
+  }
+
+  /**
+   * These tests assert over admin-cli, whose password grant cannot run an interactive required
+   * action: once provisioning makes email a required user-profile attribute, the email-less
+   * bootstrap admin is rejected with "Account is not fully set up" so we give it an email here.
+   */
+  private void giveBootstrapAdminAnEmail() {
+    UserRepresentation admin = masterUser(ADMIN_USERNAME);
+    if (admin.getEmail() == null) {
+      admin.setEmail("temp-admin@example.com");
+      admin.setEmailVerified(true);
+      adminClient().realm("master").users().get(admin.getId()).update(admin);
+    }
+  }
+
+  private void withMaster(Consumer<RealmManager> action) {
+    try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
+      action.accept(connectionManager.realmManager("master"));
+    }
+  }
+
+  private ClientRepresentation masterClient(String clientId) {
+    return adminClient().realm("master").clients().findByClientId(clientId).getFirst();
+  }
+
+  private UserRepresentation masterUser(String username) {
+    return adminClient().realm("master").users().searchByUsername(username, true).getFirst();
+  }
+
+  private long masterUserCount() {
+    return adminClient().realm("master").users().count();
+  }
+
+  private List<String> realmRoleNames(UserRepresentation user) {
+    return adminClient()
+        .realm("master")
+        .users()
+        .get(user.getId())
+        .roles()
+        .realmLevel()
+        .listAll()
+        .stream()
+        .map(role -> role.getName())
+        .toList();
+  }
+}

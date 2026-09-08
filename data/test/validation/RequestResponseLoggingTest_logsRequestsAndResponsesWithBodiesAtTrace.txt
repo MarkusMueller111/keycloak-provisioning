@@ -1,0 +1,4 @@
+POST [KEYCLOAK_URL]/admin/realms/test/roles {"attributes":null,"clientRole":null,"composite":false,"composites":null,"containerId":null,"description":null,"id":null,"name":"logged-role","scopeParamRequired":null}
+POST [KEYCLOAK_URL]/admin/realms/test/roles -> 201 
+GET [KEYCLOAK_URL]/admin/realms/test/roles/logged-role 
+GET [KEYCLOAK_URL]/admin/realms/test/roles/logged-role -> 200 {"id":"UUID_1","name":"logged-role","composite":false,"clientRole":false,"containerId":"UUID_2","attributes":{}}
