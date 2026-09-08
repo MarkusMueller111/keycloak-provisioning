@@ -1,0 +1,36 @@
+[ {
+  "flow" : {
+    "alias" : "test-flow",
+    "authenticationExecutions" : [ {
+      "authenticator" : "auth-cookie",
+      "authenticatorConfig" : null,
+      "authenticatorFlow" : false,
+      "autheticatorFlow" : false,
+      "flowAlias" : null,
+      "priority" : 0,
+      "requirement" : "REQUIRED",
+      "userSetupAllowed" : false
+    } ],
+    "builtIn" : false,
+    "description" : "a test flow",
+    "id" : "[id]",
+    "providerId" : "basic-flow",
+    "topLevel" : true
+  },
+  "executions" : [ {
+    "alias" : null,
+    "authenticationConfig" : "[authenticationConfig]",
+    "authenticationFlow" : null,
+    "configurable" : false,
+    "description" : null,
+    "displayName" : "Cookie",
+    "flowId" : "[flowId]",
+    "id" : "[id]",
+    "index" : 0,
+    "level" : 0,
+    "priority" : 0,
+    "providerId" : "auth-cookie",
+    "requirement" : "REQUIRED",
+    "requirementChoices" : [ "REQUIRED", "ALTERNATIVE", "DISABLED" ]
+  } ]
+} ]

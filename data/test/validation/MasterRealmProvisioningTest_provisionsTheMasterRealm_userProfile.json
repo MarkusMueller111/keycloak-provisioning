@@ -1,0 +1,91 @@
+{
+  "attributes" : [ {
+    "annotations" : null,
+    "defaultValue" : null,
+    "displayName" : "${email}",
+    "group" : null,
+    "multivalued" : false,
+    "name" : "email",
+    "permissions" : {
+      "edit" : [ "admin", "user" ],
+      "view" : [ "admin", "user" ]
+    },
+    "required" : {
+      "roles" : [ "admin", "user" ],
+      "scopes" : [ ]
+    },
+    "selector" : null,
+    "validations" : {
+      "email" : { },
+      "length" : {
+        "max" : 255
+      }
+    }
+  }, {
+    "annotations" : null,
+    "defaultValue" : null,
+    "displayName" : "${firstName}",
+    "group" : null,
+    "multivalued" : false,
+    "name" : "firstName",
+    "permissions" : {
+      "edit" : [ "admin", "user" ],
+      "view" : [ "admin", "user" ]
+    },
+    "required" : null,
+    "selector" : null,
+    "validations" : {
+      "length" : {
+        "max" : 255
+      },
+      "person-name-prohibited-characters" : { }
+    }
+  }, {
+    "annotations" : null,
+    "defaultValue" : null,
+    "displayName" : "${lastName}",
+    "group" : null,
+    "multivalued" : false,
+    "name" : "lastName",
+    "permissions" : {
+      "edit" : [ "admin", "user" ],
+      "view" : [ "admin", "user" ]
+    },
+    "required" : null,
+    "selector" : null,
+    "validations" : {
+      "length" : {
+        "max" : 255
+      },
+      "person-name-prohibited-characters" : { }
+    }
+  }, {
+    "annotations" : null,
+    "defaultValue" : null,
+    "displayName" : "${username}",
+    "group" : null,
+    "multivalued" : false,
+    "name" : "username",
+    "permissions" : {
+      "edit" : [ "admin", "user" ],
+      "view" : [ "admin", "user" ]
+    },
+    "required" : null,
+    "selector" : null,
+    "validations" : {
+      "length" : {
+        "max" : 255,
+        "min" : 3
+      },
+      "up-username-not-idn-homograph" : { },
+      "username-prohibited-characters" : { }
+    }
+  } ],
+  "groups" : [ {
+    "annotations" : null,
+    "displayDescription" : "Attributes, which refer to user metadata",
+    "displayHeader" : "User metadata",
+    "name" : "user-metadata"
+  } ],
+  "unmanagedAttributePolicy" : null
+}

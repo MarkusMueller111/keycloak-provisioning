@@ -1,0 +1,37 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : null,
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "with-roles",
+  "parentId" : null,
+  "path" : "/with-roles",
+  "realmRoles" : [ "alpha", "zeta" ],
+  "subGroupCount" : 0,
+  "subGroups" : [ ]
+}, {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : null,
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "without-roles",
+  "parentId" : null,
+  "path" : "/without-roles",
+  "realmRoles" : null,
+  "subGroupCount" : 0,
+  "subGroups" : [ ]
+} ]

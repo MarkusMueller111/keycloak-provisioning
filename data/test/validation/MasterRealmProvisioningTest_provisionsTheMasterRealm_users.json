@@ -1,0 +1,35 @@
+[ {
+  "access" : {
+    "manage" : true
+  },
+  "applicationRoles" : null,
+  "attributes" : {
+    "is_temporary_admin" : [ "true" ]
+  },
+  "clientConsents" : null,
+  "clientRoles" : null,
+  "createdTimestamp" : "[createdTimestamp]",
+  "credentials" : null,
+  "disableableCredentialTypes" : [ ],
+  "email" : "temp-admin@example.com",
+  "emailVerified" : true,
+  "enabled" : true,
+  "federatedIdentities" : null,
+  "federationLink" : null,
+  "firstName" : null,
+  "groups" : null,
+  "id" : "[id]",
+  "issuedVerifiableCredentials" : null,
+  "lastName" : null,
+  "notBefore" : 0,
+  "origin" : null,
+  "realmRoles" : [ "admin", "default-roles-master" ],
+  "requiredActions" : [ ],
+  "self" : null,
+  "serviceAccountClientId" : null,
+  "socialLinks" : null,
+  "totp" : false,
+  "userProfileMetadata" : null,
+  "username" : "temp-admin",
+  "verifiableCredentials" : null
+} ]

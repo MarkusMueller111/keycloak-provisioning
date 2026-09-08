@@ -1,0 +1,82 @@
+[ {
+  "flow" : {
+    "alias" : "sub-a",
+    "authenticationExecutions" : [ {
+      "authenticator" : "auth-cookie",
+      "authenticatorConfig" : null,
+      "authenticatorFlow" : false,
+      "autheticatorFlow" : false,
+      "flowAlias" : null,
+      "priority" : 0,
+      "requirement" : "DISABLED",
+      "userSetupAllowed" : false
+    } ],
+    "builtIn" : false,
+    "description" : "sub flow a",
+    "id" : "[id]",
+    "providerId" : "basic-flow",
+    "topLevel" : true
+  },
+  "executions" : [ {
+    "alias" : null,
+    "authenticationConfig" : "[authenticationConfig]",
+    "authenticationFlow" : null,
+    "configurable" : false,
+    "description" : null,
+    "displayName" : "Cookie",
+    "flowId" : "[flowId]",
+    "id" : "[id]",
+    "index" : 0,
+    "level" : 0,
+    "priority" : 0,
+    "providerId" : "auth-cookie",
+    "requirement" : "DISABLED",
+    "requirementChoices" : [ "REQUIRED", "ALTERNATIVE", "DISABLED" ]
+  } ]
+}, {
+  "flow" : {
+    "alias" : "sub-b",
+    "authenticationExecutions" : [ {
+      "authenticator" : "auth-otp-form",
+      "authenticatorConfig" : null,
+      "authenticatorFlow" : false,
+      "autheticatorFlow" : false,
+      "flowAlias" : null,
+      "priority" : 0,
+      "requirement" : "DISABLED",
+      "userSetupAllowed" : false
+    } ],
+    "builtIn" : false,
+    "description" : "sub flow b",
+    "id" : "[id]",
+    "providerId" : "basic-flow",
+    "topLevel" : true
+  },
+  "executions" : [ {
+    "alias" : null,
+    "authenticationConfig" : "[authenticationConfig]",
+    "authenticationFlow" : null,
+    "configurable" : false,
+    "description" : null,
+    "displayName" : "OTP Form",
+    "flowId" : "[flowId]",
+    "id" : "[id]",
+    "index" : 0,
+    "level" : 0,
+    "priority" : 0,
+    "providerId" : "auth-otp-form",
+    "requirement" : "DISABLED",
+    "requirementChoices" : [ "REQUIRED", "ALTERNATIVE", "DISABLED" ]
+  } ]
+}, {
+  "flow" : {
+    "alias" : "test-flow",
+    "authenticationExecutions" : [ ],
+    "builtIn" : false,
+    "description" : "a test flow",
+    "id" : "[id]",
+    "providerId" : "basic-flow",
+    "topLevel" : true
+  },
+  "executions" : [ ]
+} ]
