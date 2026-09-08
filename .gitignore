@@ -4,3 +4,5 @@ build/
 out/
 
 .gradle/
+data/test/output/
+data/test/tmp/
