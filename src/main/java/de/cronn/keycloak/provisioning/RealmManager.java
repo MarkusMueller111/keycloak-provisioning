@@ -7,6 +7,7 @@ import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentati
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
+import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -107,7 +108,7 @@ public class RealmManager {
    * Reconciles the realm roles composed into the realm's default role (i.e. granted to every user)
    * to exactly match {@code roleNames}: adds missing ones, removes any composite realm role not
    * listed. {@code roleNames} is treated as the full desired set, the same "declare it all"
-   * semantics as the disabled client ids of the master realm config. Safe to call repeatedly.
+   * semantics as {@link MasterRealmConfig#disabledClientIds()}. Safe to call repeatedly.
    */
   public void reconcileDefaultRoleComposites(Collection<String> roleNames) {
     RealmResource realm = getRealmResource();
@@ -396,8 +397,7 @@ public class RealmManager {
    * Reconciles the realm's authentication flows to exactly match {@code flows}: adds missing ones,
    * updates existing ones, and deletes any flow no longer listed. {@code flows} is treated as the
    * full desired set, the same "declare it all" semantics as {@link
-   * disabled client ids of the master realm config. Keycloak's own flows are never touched, so only
-   * flows
+   * MasterRealmConfig#disabledClientIds()}. Keycloak's own flows are never touched, so only flows
    * created outside this call are at risk of deletion. Safe to call repeatedly.
    */
   public void configureFlows(List<AuthenticationFlowRepresentation> flows) {
