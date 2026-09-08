@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning.connection.client;
 
 import de.cronn.keycloak.provisioning.RealmManager;
+import de.cronn.keycloak.provisioning.master.MasterRealmProvisioner;
 import java.util.List;
 import java.util.Map;
 import org.keycloak.representations.idm.ClientRepresentation;
@@ -10,9 +11,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Optional helper to create the client this library itself uses to authenticate against Keycloak,
- * for first-start setups where that client does not exist yet. Not called automatically by the
- * master realm provisioner — invoke it explicitly (e.g. with an admin client authenticated via the
- * bootstrap admin user) before creating the {@code Keycloak} connection you hand to it.
+ * for first-start setups where that client does not exist yet. Not called automatically by {@link
+ * MasterRealmProvisioner} — invoke it explicitly (e.g. with an admin client authenticated via the
+ * bootstrap admin user) before creating the {@code Keycloak} connection you hand to {@link
+ * MasterRealmProvisioner}.
  */
 public final class ProvisioningClientBootstrapper {
 
