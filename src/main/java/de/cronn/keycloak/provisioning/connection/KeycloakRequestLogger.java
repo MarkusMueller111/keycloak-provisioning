@@ -1,11 +1,11 @@
 package de.cronn.keycloak.provisioning.connection;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import jakarta.ws.rs.client.ClientRequestContext;
 import jakarta.ws.rs.client.ClientRequestFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.json.JsonMapper;
 
 /** Logs every Keycloak request, at TRACE including the entity it sends. */
 class KeycloakRequestLogger implements ClientRequestFilter {
@@ -30,7 +30,7 @@ class KeycloakRequestLogger implements ClientRequestFilter {
     }
     try {
       return KeycloakLoggedBody.of(JSON.writeValueAsString(request.getEntity()));
-    } catch (JacksonException e) {
+    } catch (JsonProcessingException e) {
       return "[unserializable " + request.getEntityClass().getSimpleName() + "]";
     }
   }

@@ -1,5 +1,9 @@
 package de.cronn.keycloak.provisioning;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.cronn.assertions.validationfile.junit5.JUnit5ValidationFileAssertions;
 import de.cronn.assertions.validationfile.normalization.ValidationNormalizer;
 import java.util.Comparator;
@@ -33,13 +37,13 @@ import org.keycloak.representations.idm.UserProfileMetadata;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.representations.userprofile.config.UPAttribute;
 import org.keycloak.representations.userprofile.config.UPConfig;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.json.JsonMapper;
 
 public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
 
-  JsonMapper DEFAULT_JSON_MAPPER = JsonMapper.builder().build();
+  // Alphabetic property order is Jackson 3's default; configuring it keeps the validation files
+  // stable across the move back to Jackson 3.
+  JsonMapper DEFAULT_JSON_MAPPER =
+      JsonMapper.builder().enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY).build();
 
   ValidationNormalizer idReplacer = KeycloakNormalizers.ids();
   ValidationNormalizer timestampReplacer = KeycloakNormalizers.timestamps();
@@ -416,9 +420,9 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
     try {
       return jsonMapper()
           .writerWithDefaultPrettyPrinter()
-          .withoutFeatures(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+          .without(SerializationFeature.FAIL_ON_EMPTY_BEANS)
           .writeValueAsString(actual);
-    } catch (JacksonException e) {
+    } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }
   }

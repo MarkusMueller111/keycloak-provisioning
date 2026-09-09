@@ -35,15 +35,18 @@ tasks.withType<JavaCompile> {
 }
 
 dependencies {
-    implementation(platform("tools.jackson:jackson-bom:latest.release"))
-    testFixturesApi(platform("tools.jackson:jackson-bom:latest.release"))
+    // Jackson 2, matching keycloak-admin-client: its representations declare Jackson 2 JsonNode
+    // fields that Jackson 3 cannot serialize.
+    implementation(platform("com.fasterxml.jackson:jackson-bom:latest.release"))
+    testFixturesApi(platform("com.fasterxml.jackson:jackson-bom:latest.release"))
     testImplementation(platform("org.junit:junit-bom:latest.release"))
 
     // Pinned rather than latest.release: this is api-scoped, so the version reaches every
     // consumer's classpath and is this library's statement of which Keycloak it supports.
+    // TODO Switch to keycloak-admin-client-jackson3, and Jackson 3 above, once it is released.
     api("org.keycloak:keycloak-admin-client:26.0.12")
 
-    implementation("tools.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("io.github.java-diff-utils:java-diff-utils:latest.release")
     implementation("org.apache.commons:commons-lang3:latest.release")
 
@@ -61,7 +64,7 @@ dependencies {
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation("ch.qos.logback:logback-classic:latest.release")
 
-    testFixturesApi("tools.jackson.core:jackson-databind")
+    testFixturesApi("com.fasterxml.jackson.core:jackson-databind")
     testFixturesApi("de.cronn:validation-file-assertions:latest.release")
 
     components {

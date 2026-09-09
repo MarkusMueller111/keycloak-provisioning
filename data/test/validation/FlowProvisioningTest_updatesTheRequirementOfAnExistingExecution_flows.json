@@ -1,4 +1,20 @@
 [ {
+  "executions" : [ {
+    "alias" : null,
+    "authenticationConfig" : "[authenticationConfig]",
+    "authenticationFlow" : null,
+    "configurable" : false,
+    "description" : null,
+    "displayName" : "Cookie",
+    "flowId" : "[flowId]",
+    "id" : "[id]",
+    "index" : 0,
+    "level" : 0,
+    "priority" : 0,
+    "providerId" : "auth-cookie",
+    "requirement" : "REQUIRED",
+    "requirementChoices" : [ "REQUIRED", "ALTERNATIVE", "DISABLED" ]
+  } ],
   "flow" : {
     "alias" : "test-flow",
     "authenticationExecutions" : [ {
@@ -16,21 +32,5 @@
     "id" : "[id]",
     "providerId" : "basic-flow",
     "topLevel" : true
-  },
-  "executions" : [ {
-    "alias" : null,
-    "authenticationConfig" : "[authenticationConfig]",
-    "authenticationFlow" : null,
-    "configurable" : false,
-    "description" : null,
-    "displayName" : "Cookie",
-    "flowId" : "[flowId]",
-    "id" : "[id]",
-    "index" : 0,
-    "level" : 0,
-    "priority" : 0,
-    "providerId" : "auth-cookie",
-    "requirement" : "REQUIRED",
-    "requirementChoices" : [ "REQUIRED", "ALTERNATIVE", "DISABLED" ]
-  } ]
+  }
 } ]
