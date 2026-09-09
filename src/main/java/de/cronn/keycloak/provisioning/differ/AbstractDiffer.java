@@ -1,5 +1,10 @@
 package de.cronn.keycloak.provisioning.differ;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.cronn.commons.lang.StreamUtil;
 import de.cronn.keycloak.provisioning.KeycloakException;
 import java.util.ArrayList;
@@ -9,10 +14,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.ObjectMapper;
-import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.json.JsonMapper;
 
 public class AbstractDiffer<T> {
   private final List<T> target;
@@ -97,10 +98,12 @@ public class AbstractDiffer<T> {
           JsonMapper.builder()
               .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
               .configure(SerializationFeature.INDENT_OUTPUT, true)
+              // Jackson 3's default; set explicitly so diffs survive the move back to it.
+              .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
               .build();
 
       return objectMapper.writeValueAsString(value);
-    } catch (JacksonException e) {
+    } catch (JsonProcessingException e) {
       throw new KeycloakException("JSON serialization failed", e);
     }
   }

@@ -3,6 +3,7 @@ package de.cronn.keycloak.provisioning;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakDefaultConnectionConfig;
@@ -32,7 +33,7 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
    * to fall back to the bootstrap admin to create it.
    */
   @Test
-  void bootstrapsProvisioningClientViaAdminCliOnFirstConnect() {
+  void bootstrapsProvisioningClientViaAdminCliOnFirstConnect() throws JsonProcessingException {
     assertThatThrownBy(() -> new KeycloakProvisioningConnectionManager(serverUrl(), CLIENT_CONFIG))
         .isInstanceOf(KeycloakException.class)
         .satisfies(
@@ -52,7 +53,7 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
   }
 
   @Test
-  void reconnectsAsTheProvisioningClientOnceBootstrapped() {
+  void reconnectsAsTheProvisioningClientOnceBootstrapped() throws JsonProcessingException {
     try (DefaultKeycloakConnectionManager first = connectionManager()) {
       assertThat(tokenClientId(first)).isEqualTo("system-provisioning");
     }
@@ -101,10 +102,11 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
   }
 
   /** The client the token was issued to; admin-cli's token carries no user claims at all. */
-  private String tokenClientId(KeycloakConnectionManager connectionManager) {
+  private String tokenClientId(KeycloakConnectionManager connectionManager)
+      throws JsonProcessingException {
     String[] jwt =
         connectionManager.getKeycloakClient().tokenManager().getAccessTokenString().split("\\.");
     String payload = new String(Base64.getUrlDecoder().decode(jwt[1]), StandardCharsets.UTF_8);
-    return jsonMapper().readTree(payload).get("azp").asString();
+    return jsonMapper().readTree(payload).get("azp").asText();
   }
 }
