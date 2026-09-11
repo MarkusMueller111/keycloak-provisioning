@@ -42,6 +42,7 @@ import org.keycloak.representations.idm.AuthenticationExecutionInfoRepresentatio
 import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
+import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.keycloak.representations.userprofile.config.UPAttribute;
@@ -186,6 +187,52 @@ public class RealmManager {
           Differ.calculateMultilineDiff(before, after));
       clientsResource.get(client.getId()).update(client);
     }
+  }
+
+  /**
+   * Creates the realm if it is absent, otherwise applies {@code realmCustomizer} and updates it
+   * only when that actually changes something. Safe to call repeatedly: an unchanged realm causes
+   * no write at all, which is the common case when provisioning runs on every application start.
+   */
+  public void createOrUpdateRealm(Consumer<RealmRepresentation> realmCustomizer) {
+    Optional<RealmRepresentation> existingRealm = getRealmIfExists();
+    if (existingRealm.isEmpty()) {
+      createRealm(realmCustomizer);
+      return;
+    }
+
+    RealmRepresentation realm = existingRealm.get();
+    String before = AbstractDiffer.toJson(realm);
+    realmCustomizer.accept(realm);
+    String after = AbstractDiffer.toJson(realm);
+
+    if (before.equals(after)) {
+      log.debug("Realm '{}' is up to date", realmName);
+      return;
+    }
+
+    log.info(
+        "Realm '{}' already exists, but update is required:\n{}",
+        realmName,
+        Differ.calculateMultilineDiff(before, after));
+    getRealmResource().update(realm);
+  }
+
+  private void createRealm(Consumer<RealmRepresentation> realmCustomizer) {
+    log.info("Creating realm '{}'", realmName);
+    RealmRepresentation realm = new RealmRepresentation();
+    realm.setRealm(realmName);
+    realm.setEnabled(true);
+    realmCustomizer.accept(realm);
+    keycloak.realms().create(realm);
+    // The token was issued before this realm existed and does not cover it yet.
+    refreshToken();
+  }
+
+  public Optional<RealmRepresentation> getRealmIfExists() {
+    return keycloak.realms().findAll().stream()
+        .filter(realm -> realmName.equals(realm.getRealm()))
+        .collect(StreamUtil.toSingleOptionalElement());
   }
 
   public void createOrUpdateClients(List<ClientRepresentation> clients) {
