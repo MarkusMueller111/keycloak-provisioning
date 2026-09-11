@@ -84,7 +84,7 @@ public class MasterRealmProvisioner {
         Math.toIntExact(config.sessionIdleTimeout().toSeconds()));
     realmRepresentation.setSsoSessionMaxLifespan(
         Math.toIntExact(config.sessionMaxLifespan().toSeconds()));
-    configureHttpSecurityHeaders(realmRepresentation, config.securityHeaders());
+    SecurityHeader.applyTo(realmRepresentation, config.securityHeaders());
 
     if (config.smtp() != null) {
       realmRepresentation.setSmtpServer(mapSmtpServer(config.smtp()));
@@ -182,28 +182,6 @@ public class MasterRealmProvisioner {
       newAttributes.put(key, value);
       realmRepresentation.setAttributes(newAttributes);
     }
-  }
-
-  private static void configureHttpSecurityHeaders(
-      RealmRepresentation realmRepresentation, Map<SecurityHeader, String> headers) {
-    Map<String, String> securityHeaders = realmRepresentation.getBrowserSecurityHeaders();
-    if (securityHeaders == null) {
-      securityHeaders = new LinkedHashMap<>();
-    }
-
-    for (Map.Entry<SecurityHeader, String> header : headers.entrySet()) {
-      String newValue = header.getValue();
-      String oldValue = securityHeaders.put(header.getKey().getKeycloakName(), newValue);
-      if (!Objects.equals(oldValue, newValue)) {
-        log.info(
-            "Replaced default security header {}\n-    {}\n+    {}",
-            header.getKey().name(),
-            oldValue,
-            newValue);
-      }
-    }
-
-    realmRepresentation.setBrowserSecurityHeaders(securityHeaders);
   }
 
   private static Map<String, String> mapSmtpServer(MasterRealmConfig.Smtp smtp) {

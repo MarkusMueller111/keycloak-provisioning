@@ -1,6 +1,11 @@
 package de.cronn.keycloak.provisioning;
 
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
+import org.keycloak.representations.idm.RealmRepresentation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public enum SecurityHeader {
   CONTENT_SECURITY_POLICY("contentSecurityPolicy"),
@@ -11,6 +16,8 @@ public enum SecurityHeader {
   X_FRAME_OPTIONS("xFrameOptions"),
   X_ROBOTS_TAG("xRobotsTag"),
   ;
+
+  private static final Logger log = LoggerFactory.getLogger(SecurityHeader.class);
 
   public static final Map<SecurityHeader, String> DEFAULT_VALUES =
       Map.of(
@@ -28,6 +35,29 @@ public enum SecurityHeader {
   }
 
   private final String keycloakName;
+
+  /** Writes {@code headers} into the representation, leaving any other header Keycloak set. */
+  public static void applyTo(
+      RealmRepresentation realmRepresentation, Map<SecurityHeader, String> headers) {
+    Map<String, String> browserSecurityHeaders = realmRepresentation.getBrowserSecurityHeaders();
+    if (browserSecurityHeaders == null) {
+      browserSecurityHeaders = new LinkedHashMap<>();
+    }
+
+    for (Map.Entry<SecurityHeader, String> header : headers.entrySet()) {
+      String newValue = header.getValue();
+      String oldValue = browserSecurityHeaders.put(header.getKey().getKeycloakName(), newValue);
+      if (!Objects.equals(oldValue, newValue)) {
+        log.info(
+            "Replaced default security header {}\n-    {}\n+    {}",
+            header.getKey().name(),
+            oldValue,
+            newValue);
+      }
+    }
+
+    realmRepresentation.setBrowserSecurityHeaders(browserSecurityHeaders);
+  }
 
   public String getKeycloakName() {
     return keycloakName;
