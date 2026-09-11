@@ -189,6 +189,7 @@ public class RealmManager {
   }
 
   public void createOrUpdateClients(List<ClientRepresentation> clients) {
+    clients.forEach(this::assertClientIsManaged);
     Predicate<ClientRepresentation> existingClientsPredicate =
         c -> clientNaming.isManaged(c.getClientId());
     createOrUpdateClients(clients, existingClientsPredicate);
@@ -208,6 +209,23 @@ public class RealmManager {
         clientId,
         clientNaming.prefix());
     createOrUpdateClients(List.of(client), existing -> clientId.equals(existing.getClientId()));
+  }
+
+  /**
+   * Without the prefix a client would be created but never recognized as existing again, so the
+   * next run would try to create it a second time and fail with a conflict.
+   */
+  private void assertClientIsManaged(ClientRepresentation client) {
+    String clientId = client.getClientId();
+    if (!clientNaming.isManaged(clientId)) {
+      throw new KeycloakException(
+          "Client '"
+              + clientId
+              + "' cannot be provisioned: its id must carry the configured prefix '"
+              + clientNaming.prefix()
+              + "'. Use SystemClientNaming.clientId(...) to build it, or configure a naming whose"
+              + " prefix matches.");
+    }
   }
 
   void createOrUpdateClients(
