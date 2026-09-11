@@ -315,6 +315,39 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(clientIds()).doesNotContain("unmanaged-app");
   }
 
+  /** These flags only took effect on creation before, so drift could not be provisioned away. */
+  @Test
+  void reconcilesClientFlagsOnUpdate() {
+    ClientRepresentation initial = client("system-a");
+    initial.setStandardFlowEnabled(true);
+    initial.setServiceAccountsEnabled(true);
+    withRealmManager(rm -> rm.createOrUpdateClients(List.of(initial)));
+
+    ClientRepresentation changed = client("system-a");
+    changed.setStandardFlowEnabled(false);
+    changed.setServiceAccountsEnabled(false);
+    withRealmManager(rm -> rm.createOrUpdateClients(List.of(changed)));
+
+    ClientRepresentation actual = findClient("system-a");
+    assertThat(actual.isStandardFlowEnabled()).isFalse();
+    assertThat(actual.isServiceAccountsEnabled()).isFalse();
+  }
+
+  /**
+   * Safe to reconcile because a managed client can never be one of Keycloak's own: those carry no
+   * prefix, and this method rejects anything without one.
+   */
+  @Test
+  void reEnablesAManagedClientThatWasDisabledOutOfBand() {
+    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client("system-a"))));
+    disableInAdminConsole("system-a");
+    assertThat(findClient("system-a").isEnabled()).isFalse();
+
+    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client("system-a"))));
+
+    assertThat(findClient("system-a").isEnabled()).isTrue();
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);
@@ -357,6 +390,12 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         .get(findClient(clientId).getId())
         .getSecret()
         .getValue();
+  }
+
+  private void disableInAdminConsole(String clientId) {
+    ClientRepresentation client = findClient(clientId);
+    client.setEnabled(false);
+    adminClient().realm(REALM).clients().get(client.getId()).update(client);
   }
 
   private ClientRepresentation findClient(String clientId) {

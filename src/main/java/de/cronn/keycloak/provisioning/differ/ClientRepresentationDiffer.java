@@ -15,6 +15,10 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setBaseUrl(source.getBaseUrl());
       target.setAdminUrl(source.getAdminUrl());
       target.setDirectAccessGrantsEnabled(source.isDirectAccessGrantsEnabled());
+      target.setStandardFlowEnabled(source.isStandardFlowEnabled());
+      target.setServiceAccountsEnabled(source.isServiceAccountsEnabled());
+      target.setAuthorizationServicesEnabled(source.getAuthorizationServicesEnabled());
+      target.setProtocol(source.getProtocol());
       target.setFrontchannelLogout(source.isFrontchannelLogout());
       target.setRedirectUris(source.getRedirectUris());
       target.setWebOrigins(source.getWebOrigins());
@@ -23,6 +27,7 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
         target.setSecret(source.getSecret());
       }
       target.setAttributes(source.getAttributes());
+      target.setEnabled(source.isEnabled());
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
       // so RealmManager reconciles them through the dedicated endpoints afterwards.
     };
