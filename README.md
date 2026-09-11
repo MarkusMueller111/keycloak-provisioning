@@ -207,6 +207,40 @@ new KeycloakDefaultConnectionConfig(
     naming);
 ```
 
+## Provisioning an application realm
+
+`AppRealmProvisioner` creates a realm and keeps its realm-level settings in sync:
+
+```java
+AppRealmConfig config =
+    AppRealmConfig.builder("my-realm")
+        .displayName("My Application")   // defaults to the realm name
+        .sslRequired(SslRequired.NONE)   // default: EXTERNAL, as in Keycloak
+        .sessionIdleTimeout(Duration.ofMinutes(30))
+        .build();
+
+new AppRealmProvisioner(realmManager, config).provision();
+```
+
+It covers only settings Keycloak does not already default sensibly — brute-force protection and
+events are turned on, everything else keeps Keycloak's own default. Anything not modelled (locales,
+login theme, SMTP, password policy, WebAuthn) goes through `realmCustomizer`, which runs last and
+can override the rest.
+
+The realm's **content** is deliberately not part of the config: roles, groups, clients and scopes
+differ per project, as does the order they have to be created in, so you provision them with
+`RealmManager` calls afterwards.
+
+**Provision the realm first.** `createOrUpdateRealm` is the only call that refreshes the access
+token, which the admin client issues before your realm exists. Provisioning content into a realm
+that does not exist yet fails with a bare `NotFoundException` from the admin client, which does not
+say which realm is missing. Two more orderings are forced by Keycloak: roles before anything
+referencing them by name, and client scopes before the clients that assign them.
+
+Creating a realm makes Keycloak add a bearer-only `<realm>-realm` client **to the master realm**.
+That is stock Keycloak behaviour, not this library, but it will show up as unexpected churn if you
+assert the master realm's clients against a validation file.
+
 ## Hardening the master realm
 
 `MasterRealmProvisioner` applies a set of defaults to the master realm that a production deployment
