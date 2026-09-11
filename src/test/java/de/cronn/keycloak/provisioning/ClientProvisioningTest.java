@@ -299,6 +299,22 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
   }
 
+  /**
+   * Without the prefix the client would be created and then never recognized as existing, so the
+   * next run would fail with a conflict instead.
+   */
+  @Test
+  void rejectsAClientWhoseIdLacksTheConfiguredPrefix() {
+    ClientRepresentation unmanaged = client("unmanaged-app");
+
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(unmanaged))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("unmanaged-app")
+        .hasMessageContaining("system-");
+
+    assertThat(clientIds()).doesNotContain("unmanaged-app");
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);
