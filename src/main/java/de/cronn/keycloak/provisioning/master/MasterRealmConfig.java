@@ -5,6 +5,7 @@ import de.cronn.keycloak.provisioning.BuiltInClientConfig;
 import de.cronn.keycloak.provisioning.KeycloakProvidedClient;
 import de.cronn.keycloak.provisioning.KeycloakProvidedRequiredAction;
 import de.cronn.keycloak.provisioning.SecurityHeader;
+import de.cronn.keycloak.provisioning.SslRequired;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
 import java.time.Duration;
 import java.util.Collection;
@@ -44,6 +45,7 @@ public final class MasterRealmConfig {
   private final Duration sessionIdleTimeout;
   private final Duration sessionMaxLifespan;
   private final boolean bruteForceProtected;
+  private final SslRequired sslRequired;
   private final Map<SecurityHeader, String> securityHeaders;
   private final List<BuiltInClientConfig> builtInClients;
   private final boolean deleteTemporaryAdminUsers;
@@ -64,6 +66,7 @@ public final class MasterRealmConfig {
     this.sessionMaxLifespan =
         builder.sessionMaxLifespan == null ? Duration.ofHours(1) : builder.sessionMaxLifespan;
     this.bruteForceProtected = builder.bruteForceProtected;
+    this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
     this.securityHeaders =
         builder.securityHeaders == null
             ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
@@ -193,6 +196,10 @@ public final class MasterRealmConfig {
     return bruteForceProtected;
   }
 
+  public SslRequired sslRequired() {
+    return sslRequired;
+  }
+
   public Map<SecurityHeader, String> securityHeaders() {
     return securityHeaders;
   }
@@ -265,6 +272,7 @@ public final class MasterRealmConfig {
     private Duration sessionIdleTimeout;
     private Duration sessionMaxLifespan;
     private boolean bruteForceProtected = true;
+    private SslRequired sslRequired;
     private Map<SecurityHeader, String> securityHeaders;
     private List<BuiltInClientConfig> builtInClients;
     private boolean deleteTemporaryAdminUsers = true;
@@ -301,6 +309,11 @@ public final class MasterRealmConfig {
 
     public Builder bruteForceProtected(boolean bruteForceProtected) {
       this.bruteForceProtected = bruteForceProtected;
+      return this;
+    }
+
+    public Builder sslRequired(SslRequired sslRequired) {
+      this.sslRequired = sslRequired;
       return this;
     }
 
