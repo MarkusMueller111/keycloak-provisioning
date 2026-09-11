@@ -77,6 +77,7 @@ public class MasterRealmProvisioner {
     realmRepresentation.setAdminEventsEnabled(true);
     realmRepresentation.setEventsEnabled(true);
     realmRepresentation.setBruteForceProtected(config.bruteForceProtected());
+    realmRepresentation.setSslRequired(config.sslRequired().getKeycloakValue());
     realmRepresentation.setRevokeRefreshToken(false);
     realmRepresentation.setPasswordPolicy(config.passwordPolicy());
     realmRepresentation.setSsoSessionIdleTimeout(

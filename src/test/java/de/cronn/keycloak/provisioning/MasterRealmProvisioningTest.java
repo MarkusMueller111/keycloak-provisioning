@@ -188,6 +188,13 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(masterUserCount()).isEqualTo(usersBefore);
   }
 
+  @Test
+  void appliesTheConfiguredSslRequirement() {
+    provision(configBuilder(PermanentAdmin.none()).sslRequired(SslRequired.NONE).build());
+
+    assertThat(masterRealm().getSslRequired()).isEqualTo("none");
+  }
+
   /**
    * Keeps the bootstrap admin usable for the assertions: deleting the temporary admins or disabling
    * admin-cli would cut off the only way back in.
@@ -225,6 +232,10 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
       action.accept(connectionManager.realmManager("master"));
     }
+  }
+
+  private org.keycloak.representations.idm.RealmRepresentation masterRealm() {
+    return adminClient().realm("master").toRepresentation();
   }
 
   private ClientRepresentation masterClient(String clientId) {
