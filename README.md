@@ -101,6 +101,7 @@ deleted, what Keycloak created is returned to its default.
 | `reconcileDefaultRoleComposites` | removes every composite of the realm's default role not in the list |
 | `configureUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
 | `reconcileBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
+| `TestUserProvisioner.createOrUpdateUsers` | deletes **every user in the realm** that is not in the list — see below |
 
 ### Authentication flows
 
@@ -177,6 +178,24 @@ remove it, because there is no way to know what Keycloak's value for that field 
 the opposite explicitly to undo one.
 
 `realm-management` cannot be disabled — Keycloak refuses it, and `build()` rejects the attempt.
+
+### Provisioning users
+
+User reconciliation lives in `TestUserProvisioner` rather than on `RealmManager`, because a user
+list is rarely configuration: a realm that matters gets its accounts from people signing up or from
+an identity provider, not from a list in your source code.
+
+```java
+new TestUserProvisioner(realmManager).createOrUpdateUsers(List.of(testUser));
+```
+
+Use it for realms whose whole user list is fixture data — a test container, a demo environment, a
+seeded local setup. It takes the full desired state like the other reconciling methods, but note
+that users carry no naming prefix, so there is no fence here: **an incomplete list deletes real
+accounts**. Service accounts are unaffected, as Keycloak keeps them out of the user listing.
+
+Credentials on a user are applied on every run rather than diffed. Keycloak never returns a
+credential's value, so there is no way to tell whether it still matches.
 
 ### Client naming
 
