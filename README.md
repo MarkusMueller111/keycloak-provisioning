@@ -79,7 +79,7 @@ beforehand.
 If you manage the `Keycloak` client yourself, construct a `RealmManager` directly:
 
 ```java
-new RealmManager(keycloak, "master", SystemClientNaming.standard());
+new RealmManager(keycloak, "master", ManagedNaming.standard());
 ```
 
 Every connection manager acquires a token in its constructor, so a misconfigured connection fails
@@ -197,17 +197,25 @@ accounts**. Service accounts are unaffected, as Keycloak keeps them out of the u
 Credentials on a user are applied on every run rather than diffed. Keycloak never returns a
 credential's value, so there is no way to tell whether it still matches.
 
-### Client naming
+### Naming
 
-`createOrUpdateClients` only ever deletes clients carrying the configured prefix, which is what
-keeps it away from clients you did not provision. A realm therefore has to keep the same prefix for
-its whole lifetime: changing it orphans everything provisioned under the old prefix and pulls
-unrelated clients into scope for deletion.
+The reconciling methods only ever delete objects carrying the configured prefix, which is what keeps
+them away from anything you did not provision. A realm therefore has to keep the same naming for its
+whole lifetime: changing it orphans everything provisioned under the old prefix and pulls unrelated
+objects into scope for deletion.
 
 ```java
-SystemClientNaming.standard()      // "system-"
-SystemClientNaming.custom("acme-")
+ManagedNaming.standard()                            // "system-", "[System] ", "system-"
+ManagedNaming.custom("acme-", "[Acme] ", "acme-")   // clients, groups, roles
 ```
+
+Groups get a different standard prefix because their names are shown to people in the admin
+console, where `system-` reads badly. For the same reason `custom(...)` takes all three prefixes
+rather than applying one everywhere.
+
+The prefix means "provisioned by this library" and nothing else — it is not a tenant or project
+marker. In a Keycloak serving one application every object belongs to that application anyway, so
+`standard()` is almost always right.
 
 The provisioning client is deliberately **not** named through this: its id carries no prefix, so it
 stays outside the managed namespace and your own `createOrUpdateClients` call — which deletes every
@@ -217,7 +225,7 @@ A connection carries one naming and passes it to every `RealmManager` it creates
 disagree:
 
 ```java
-SystemClientNaming naming = SystemClientNaming.custom("acme-");
+ManagedNaming naming = ManagedNaming.custom("acme-", "[Acme] ", "acme-");
 
 new KeycloakDefaultConnectionConfig(
     serverUrl,

@@ -1,8 +1,8 @@
 package de.cronn.keycloak.provisioning.connection;
 
 import de.cronn.keycloak.provisioning.KeycloakException;
+import de.cronn.keycloak.provisioning.ManagedNaming;
 import de.cronn.keycloak.provisioning.RealmManager;
-import de.cronn.keycloak.provisioning.SystemClientNaming;
 import jakarta.ws.rs.client.Client;
 import java.time.Duration;
 import java.util.Objects;
@@ -18,13 +18,13 @@ public abstract class KeycloakConnectionManager implements AutoCloseable {
   protected static final Duration TIMEOUT = Duration.ofSeconds(20);
   protected final Logger log = LoggerFactory.getLogger(getClass());
 
-  private final SystemClientNaming clientNaming;
+  private final ManagedNaming clientNaming;
 
   protected KeycloakConnectionManager() {
-    this(SystemClientNaming.standard());
+    this(ManagedNaming.standard());
   }
 
-  protected KeycloakConnectionManager(SystemClientNaming clientNaming) {
+  protected KeycloakConnectionManager(ManagedNaming clientNaming) {
     this.clientNaming = Objects.requireNonNull(clientNaming);
     log.info("Connecting to Keycloak using {}", getClass().getSimpleName());
   }

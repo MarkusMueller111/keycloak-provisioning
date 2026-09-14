@@ -1,6 +1,6 @@
 package de.cronn.keycloak.provisioning.connection;
 
-import de.cronn.keycloak.provisioning.SystemClientNaming;
+import de.cronn.keycloak.provisioning.ManagedNaming;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentialsConfig;
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
 import de.cronn.keycloak.provisioning.connection.client.ProvisioningClientBootstrapper;
@@ -18,28 +18,27 @@ public final class KeycloakDefaultConnectionConfig {
   private final String serverUrl;
   private final KeycloakAdminCredentialsConfig adminCredentialsConfig;
   private final KeycloakProvisioningClientConfig provisioningClientConfig;
-  private final SystemClientNaming clientNaming;
+  private final ManagedNaming clientNaming;
 
   public KeycloakDefaultConnectionConfig(
       String serverUrl,
       KeycloakAdminCredentialsConfig adminCredentialsConfig,
       KeycloakProvisioningClientConfig provisioningClientConfig) {
-    this(
-        serverUrl, adminCredentialsConfig, provisioningClientConfig, SystemClientNaming.standard());
+    this(serverUrl, adminCredentialsConfig, provisioningClientConfig, ManagedNaming.standard());
   }
 
   public KeycloakDefaultConnectionConfig(
       String serverUrl,
       KeycloakAdminCredentialsConfig adminCredentialsConfig,
       KeycloakProvisioningClientConfig provisioningClientConfig,
-      SystemClientNaming clientNaming) {
+      ManagedNaming clientNaming) {
     this.serverUrl = Validate.notBlank(serverUrl);
     this.adminCredentialsConfig = Objects.requireNonNull(adminCredentialsConfig);
     this.provisioningClientConfig = Objects.requireNonNull(provisioningClientConfig);
     this.clientNaming = Objects.requireNonNull(clientNaming);
   }
 
-  public SystemClientNaming clientNaming() {
+  public ManagedNaming clientNaming() {
     return clientNaming;
   }
 
