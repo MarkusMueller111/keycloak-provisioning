@@ -1,7 +1,7 @@
 package de.cronn.keycloak.provisioning.connection.admincli;
 
 import de.cronn.keycloak.provisioning.KeycloakProvidedClient;
-import de.cronn.keycloak.provisioning.SystemClientNaming;
+import de.cronn.keycloak.provisioning.ManagedNaming;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
@@ -12,11 +12,11 @@ public final class KeycloakAdminCliConnectionManager extends KeycloakConnectionM
 
   public KeycloakAdminCliConnectionManager(
       String serverUrl, KeycloakAdminCredentialsConfig config) {
-    this(serverUrl, config, SystemClientNaming.standard());
+    this(serverUrl, config, ManagedNaming.standard());
   }
 
   public KeycloakAdminCliConnectionManager(
-      String serverUrl, KeycloakAdminCredentialsConfig config, SystemClientNaming clientNaming) {
+      String serverUrl, KeycloakAdminCredentialsConfig config, ManagedNaming clientNaming) {
     super(clientNaming);
     this.keycloak =
         getDefaultKeycloakBuilder(serverUrl)

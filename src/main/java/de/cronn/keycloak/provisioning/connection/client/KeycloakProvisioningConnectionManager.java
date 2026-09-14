@@ -1,6 +1,6 @@
 package de.cronn.keycloak.provisioning.connection.client;
 
-import de.cronn.keycloak.provisioning.SystemClientNaming;
+import de.cronn.keycloak.provisioning.ManagedNaming;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import org.keycloak.OAuth2Constants;
 import org.keycloak.admin.client.Keycloak;
@@ -11,11 +11,11 @@ public final class KeycloakProvisioningConnectionManager extends KeycloakConnect
 
   public KeycloakProvisioningConnectionManager(
       String serverUrl, KeycloakProvisioningClientConfig config) {
-    this(serverUrl, config, SystemClientNaming.standard());
+    this(serverUrl, config, ManagedNaming.standard());
   }
 
   public KeycloakProvisioningConnectionManager(
-      String serverUrl, KeycloakProvisioningClientConfig config, SystemClientNaming clientNaming) {
+      String serverUrl, KeycloakProvisioningClientConfig config, ManagedNaming clientNaming) {
     super(clientNaming);
     this.keycloak =
         getDefaultKeycloakBuilder(serverUrl)
