@@ -175,10 +175,12 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void reconcilesClientScopesOfAnExistingClient() {
     ClientRepresentation initial = client("system-a");
     initial.setDefaultClientScopes(List.of("profile", "email"));
+    initial.setOptionalClientScopes(List.of());
     withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
 
     ClientRepresentation changed = client("system-a");
     changed.setDefaultClientScopes(List.of("email", "roles"));
+    changed.setOptionalClientScopes(List.of());
     withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(changed)));
 
     assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("email", "roles");
@@ -210,6 +212,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void failsOnAClientScopeThatDoesNotExist() {
     ClientRepresentation client = client("system-a");
     client.setDefaultClientScopes(List.of("no-such-scope"));
+    client.setOptionalClientScopes(List.of());
 
     assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(client))))
         .isInstanceOf(KeycloakException.class)
@@ -346,6 +349,42 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     withRealmManager(rm -> rm.createOrUpdateClients(List.of(client("system-a"))));
 
     assertThat(findClient("system-a").isEnabled()).isTrue();
+  }
+
+  /**
+   * Keycloak skips the realm defaults for both lists as soon as either is given, so a half-declared
+   * client silently loses its default scopes.
+   */
+  @Test
+  void rejectsAClientThatDeclaresOnlyOneOfItsScopeLists() {
+    ClientRepresentation onlyOptional = client("system-a");
+    onlyOptional.setOptionalClientScopes(List.of());
+
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(onlyOptional))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("system-a")
+        .hasMessageContaining("optional");
+
+    ClientRepresentation onlyDefault = client("system-b");
+    onlyDefault.setDefaultClientScopes(List.of("profile"));
+
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(onlyDefault))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("default");
+  }
+
+  /** Declaring both is the way to opt out of one list without losing the other. */
+  @Test
+  void keepsTheDefaultScopesWhenBothListsAreDeclared() {
+    ClientRepresentation client = client("system-a");
+    client.setDefaultClientScopes(List.of("profile", "email"));
+    client.setOptionalClientScopes(List.of());
+
+    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client)));
+
+    assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("profile", "email");
+    assertThat(optionalScopeNames("system-a")).isEmpty();
   }
 
   private static ClientRepresentation client(String clientId) {

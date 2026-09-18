@@ -197,6 +197,21 @@ accounts**. Service accounts are unaffected, as Keycloak keeps them out of the u
 Credentials on a user are applied on every run rather than diffed. Keycloak never returns a
 credential's value, so there is no way to tell whether it still matches.
 
+### Client scopes
+
+Declare both scope lists on a client, or neither:
+
+```java
+client.setDefaultClientScopes(List.of("web-origins", "acr", "profile", "roles", "basic", "email"));
+client.setOptionalClientScopes(List.of());
+```
+
+Naming either list opts the client out of the realm's default scopes for **both** — Keycloak's
+behaviour, not this library's. A client that declares only its optional scopes therefore ends up
+with no default scopes either, and its tokens carry neither `preferred_username` nor realm roles
+while login still succeeds, which makes the omission easy to miss. `createOrUpdateClients` rejects
+a half-declared client rather than letting that happen.
+
 ### Naming
 
 The reconciling methods only ever delete objects carrying the configured prefix, which is what keeps
