@@ -237,6 +237,7 @@ public class RealmManager {
 
   public void createOrUpdateClients(List<ClientRepresentation> clients) {
     clients.forEach(this::assertClientIsManaged);
+    clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
     createOrUpdateClients(clients, existingClientsPredicate);
   }
@@ -272,6 +273,28 @@ public class RealmManager {
               + "'. Use ManagedNaming.clientId(...) to build it, or configure a naming whose"
               + " prefix matches.");
     }
+  }
+
+  /**
+   * Keycloak treats scope assignment on a new client as all-or-nothing: specifying either list
+   * makes it skip the realm's default scopes for <em>both</em>, so a client that only sets the
+   * optional list silently ends up with no default scopes either. Declaring one without the other
+   * is therefore always a mistake, and reconciliation cannot repair it — a null list means "leave
+   * as is", which is indistinguishable from "was never assigned".
+   */
+  private static void assertClientScopesAreCompletelySpecified(ClientRepresentation client) {
+    boolean defaultScopesGiven = client.getDefaultClientScopes() != null;
+    boolean optionalScopesGiven = client.getOptionalClientScopes() != null;
+    if (defaultScopesGiven == optionalScopesGiven) {
+      return;
+    }
+    throw new KeycloakException(
+        "Client '"
+            + client.getClientId()
+            + "' declares only its "
+            + (defaultScopesGiven ? "default" : "optional")
+            + " client scopes. Keycloak then assigns neither list's realm defaults, so declare both"
+            + " (an empty list assigns none) or neither (Keycloak's defaults apply).");
   }
 
   void createOrUpdateClients(
