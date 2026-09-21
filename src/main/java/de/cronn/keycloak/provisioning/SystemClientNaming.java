@@ -26,17 +26,21 @@ public final class SystemClientNaming {
     return new SystemClientNaming(prefix);
   }
 
-  public SystemClientId clientId(String clientId) {
+  public String clientId(String clientId) {
     Validate.notBlank(clientId, "clientId must not be blank");
     Validate.isTrue(
         !isManaged(clientId),
         "clientId must be given without the '%s' prefix, but was '%s'",
         prefix,
         clientId);
-    return new SystemClientId(clientId, prefix + clientId);
+    return prefix + clientId;
   }
 
   public boolean isManaged(String clientId) {
     return clientId.startsWith(prefix);
+  }
+
+  public String prefix() {
+    return prefix;
   }
 }

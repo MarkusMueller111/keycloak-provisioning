@@ -25,8 +25,7 @@ import org.keycloak.representations.idm.UserRepresentation;
 class ConnectionBootstrapTest extends OwnKeycloakTest {
 
   private static final KeycloakProvisioningClientConfig CLIENT_CONFIG =
-      new KeycloakProvisioningClientConfig(
-          SystemClientNaming.standard().clientId("provisioning"), "secret");
+      new KeycloakProvisioningClientConfig("keycloak-provisioning", "secret");
 
   /**
    * Before the provisioning client exists nothing can authenticate as it, so the first connect has
@@ -48,18 +47,18 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
     }
 
     try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
-      assertThat(tokenClientId(connectionManager)).isEqualTo("system-provisioning");
+      assertThat(tokenClientId(connectionManager)).isEqualTo("keycloak-provisioning");
     }
   }
 
   @Test
   void reconnectsAsTheProvisioningClientOnceBootstrapped() throws JsonProcessingException {
     try (DefaultKeycloakConnectionManager first = connectionManager()) {
-      assertThat(tokenClientId(first)).isEqualTo("system-provisioning");
+      assertThat(tokenClientId(first)).isEqualTo("keycloak-provisioning");
     }
 
     try (DefaultKeycloakConnectionManager second = connectionManager()) {
-      assertThat(tokenClientId(second)).isEqualTo("system-provisioning");
+      assertThat(tokenClientId(second)).isEqualTo("keycloak-provisioning");
       validateServiceAccountUsers(second.realmManager("master"));
     }
   }
@@ -69,7 +68,7 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
     try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
       RealmManager master = connectionManager.realmManager("master");
       UserRepresentation serviceAccount =
-          master.getClientByClientId("system-provisioning").orElseThrow().getServiceAccountUser();
+          master.getClientByClientId("keycloak-provisioning").orElseThrow().getServiceAccountUser();
 
       assertThat(realmRoleNames(master, serviceAccount)).contains(RealmManager.ADMIN_REALM_ROLE);
     }
@@ -90,7 +89,7 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
 
     assertThatThrownBy(() -> new DefaultKeycloakConnectionManager(config))
         .isInstanceOf(KeycloakException.class)
-        .hasMessageContaining("system-provisioning")
+        .hasMessageContaining("keycloak-provisioning")
         .hasMessageContaining(serverUrl())
         .hasRootCauseInstanceOf(WebApplicationException.class);
   }

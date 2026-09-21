@@ -48,7 +48,7 @@ public final class DefaultKeycloakConnectionManager extends KeycloakConnectionMa
 
   private static String bootstrapFailureMessage(KeycloakDefaultConnectionConfig config) {
     return "Failed to bootstrap provisioning client '"
-        + config.provisioningClientConfig().clientId().value()
+        + config.provisioningClientConfig().clientId()
         + "' at "
         + config.serverUrl();
   }

@@ -65,8 +65,7 @@ KeycloakDefaultConnectionConfig config =
     new KeycloakDefaultConnectionConfig(
         serverUrl,
         new KeycloakAdminCredentialsConfig(adminUsername, adminPassword),
-        new KeycloakProvisioningClientConfig(
-            SystemClientNaming.standard().clientId("provisioning"), clientSecret));
+        new KeycloakProvisioningClientConfig("keycloak-provisioning", clientSecret));
 
 try (DefaultKeycloakConnectionManager connection = new DefaultKeycloakConnectionManager(config)) {
     RealmManager realmManager = connection.realmManager("master");
@@ -115,6 +114,10 @@ SystemClientNaming.standard()      // "system-"
 SystemClientNaming.custom("acme-")
 ```
 
+The provisioning client is deliberately **not** named through this: its id carries no prefix, so it
+stays outside the managed namespace and your own `createOrUpdateClients` call — which deletes every
+managed client not in the list — does not delete the identity you are connected as.
+
 A connection carries one naming and passes it to every `RealmManager` it creates, so the two cannot
 disagree:
 
@@ -124,7 +127,7 @@ SystemClientNaming naming = SystemClientNaming.custom("acme-");
 new KeycloakDefaultConnectionConfig(
     serverUrl,
     adminCredentials,
-    new KeycloakProvisioningClientConfig(naming.clientId("provisioning"), clientSecret),
+    new KeycloakProvisioningClientConfig("keycloak-provisioning", clientSecret),
     naming);
 ```
 
