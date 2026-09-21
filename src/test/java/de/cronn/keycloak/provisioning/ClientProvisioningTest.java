@@ -191,6 +191,41 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         .hasMessageContaining("system-a");
   }
 
+  /**
+   * Keycloak will not take a new secret on the client update, so that one case recreates the
+   * client. Everything else has to be updated in place — recreating costs the client its id, and
+   * with it the service account and any roles mapped to it.
+   */
+  @Test
+  void keepsTheClientWhenSomethingOtherThanTheSecretChanges() {
+    ClientRepresentation initial = client("system-a");
+    initial.setSecret("s3cr3t");
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
+    String idBefore = findClient("system-a").getId();
+
+    ClientRepresentation renamed = client("system-a");
+    renamed.setSecret("s3cr3t");
+    renamed.setName("renamed");
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(renamed)));
+
+    assertThat(findClient("system-a").getId()).isEqualTo(idBefore);
+    assertThat(findClient("system-a").getName()).isEqualTo("renamed");
+  }
+
+  /** Keycloak keeps the id on the recreate, so the new secret is what proves it happened. */
+  @Test
+  void appliesANewSecretToAnExistingClient() {
+    ClientRepresentation initial = client("system-a");
+    initial.setSecret("s3cr3t");
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
+
+    ClientRepresentation rotated = client("system-a");
+    rotated.setSecret("r0tat3d");
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(rotated)));
+
+    assertThat(clientSecret("system-a")).isEqualTo("r0tat3d");
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);
@@ -206,6 +241,15 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
   private List<String> systemClientIds() {
     return clientIds().stream().filter(id -> id.startsWith("system-")).toList();
+  }
+
+  private String clientSecret(String clientId) {
+    return adminClient()
+        .realm(REALM)
+        .clients()
+        .get(findClient(clientId).getId())
+        .getSecret()
+        .getValue();
   }
 
   private ClientRepresentation findClient(String clientId) {

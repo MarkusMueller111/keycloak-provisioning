@@ -300,7 +300,7 @@ public class RealmManager {
         "Client '{}' already exists, but update is required:\n{}",
         newClient.getClientId(),
         update.multiLineDiff());
-    if (!update.multiLineDiff().contains("secret")) {
+    if (!ClientRepresentationDiffer.isSecretChanged(update.multiLineDiff())) {
       getRealmResource().clients().get(newClient.getId()).update(newClient);
       log.info("Client '{}' updated.", newClient.getClientId());
     } else {
