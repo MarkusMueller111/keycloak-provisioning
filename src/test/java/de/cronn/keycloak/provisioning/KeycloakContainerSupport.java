@@ -74,7 +74,6 @@ abstract class KeycloakContainerSupport implements KeycloakTestTraits {
         new KeycloakDefaultConnectionConfig(
             serverUrl(),
             new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, ADMIN_PASSWORD),
-            new KeycloakProvisioningClientConfig(
-                SystemClientNaming.standard().clientId("provisioning"), "secret")));
+            new KeycloakProvisioningClientConfig("keycloak-provisioning", "secret")));
   }
 }

@@ -79,7 +79,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         new KeycloakDefaultConnectionConfig(
             serverUrl(),
             new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, ADMIN_PASSWORD),
-            new KeycloakProvisioningClientConfig(acme.clientId("provisioning"), "secret"),
+            new KeycloakProvisioningClientConfig("keycloak-provisioning", "secret"),
             acme);
 
     try (Response response = adminClient().realm(REALM).clients().create(client("system-kept"))) {
@@ -156,6 +156,39 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(client))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("no-such-scope");
+  }
+
+  /** Bootstrapping one client must not put the realm's other managed clients in scope. */
+  @Test
+  void createsOrUpdatesASingleClientWithoutTouchingTheOthers() {
+    withRealmManager(
+        realmManager ->
+            realmManager.createOrUpdateClients(List.of(client("system-a"), client("system-b"))));
+
+    withRealmManager(realmManager -> realmManager.createOrUpdateUnmanagedClient(client("app-c")));
+
+    assertThat(systemClientIds()).containsExactlyInAnyOrder("system-a", "system-b");
+    assertThat(clientIds()).contains("app-c");
+  }
+
+  @Test
+  void updatesTheUnmanagedClientInPlace() {
+    withRealmManager(realmManager -> realmManager.createOrUpdateUnmanagedClient(client("app-a")));
+
+    ClientRepresentation renamed = client("app-a");
+    renamed.setName("renamed");
+    withRealmManager(realmManager -> realmManager.createOrUpdateUnmanagedClient(renamed));
+
+    assertThat(findClient("app-a").getName()).isEqualTo("renamed");
+  }
+
+  /** The managed namespace has its own reconciliation; mixing the two would fence nothing. */
+  @Test
+  void rejectsAManagedClientId() {
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(client("system-a"))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("system-a");
   }
 
   private static ClientRepresentation client(String clientId) {

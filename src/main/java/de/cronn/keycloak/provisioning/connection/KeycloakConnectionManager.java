@@ -34,10 +34,6 @@ public abstract class KeycloakConnectionManager implements AutoCloseable {
     return new RealmManager(getKeycloakClient(), realmName, clientNaming);
   }
 
-  protected SystemClientNaming clientNaming() {
-    return clientNaming;
-  }
-
   /**
    * Acquires a token so a broken connection fails here rather than on some later call: the Keycloak
    * builder only constructs, it never contacts the server. Subclasses must call this once their

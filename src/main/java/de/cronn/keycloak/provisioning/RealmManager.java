@@ -22,6 +22,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
@@ -157,6 +158,22 @@ public class RealmManager {
     Predicate<ClientRepresentation> existingClientsPredicate =
         c -> clientNaming.isManaged(c.getClientId());
     createOrUpdateClients(clients, existingClientsPredicate);
+  }
+
+  /**
+   * Reconciles one client outside the managed namespace, scoped to its own id so nothing else can
+   * be deleted. For clients this library creates but does not own the lifecycle of. E.g. the
+   * provisioning client itself, which must stay clear of {@link #createOrUpdateClients} so a
+   * consumer's own reconciliation does not delete the identity it is connected as.
+   */
+  public void createOrUpdateUnmanagedClient(ClientRepresentation client) {
+    String clientId = client.getClientId();
+    Validate.isTrue(
+        !clientNaming.isManaged(clientId),
+        "Client '%s' carries the managed prefix '%s' and belongs in createOrUpdateClients",
+        clientId,
+        clientNaming.prefix());
+    createOrUpdateClients(List.of(client), existing -> clientId.equals(existing.getClientId()));
   }
 
   void createOrUpdateClients(

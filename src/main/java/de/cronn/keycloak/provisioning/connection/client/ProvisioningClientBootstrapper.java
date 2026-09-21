@@ -30,7 +30,7 @@ public final class ProvisioningClientBootstrapper {
   public static void registerClient(
       RealmManager realmManager, KeycloakProvisioningClientConfig provisioningClientConfig) {
     ClientRepresentation client = getProvisioningClientRepresentation(provisioningClientConfig);
-    realmManager.createOrUpdateClients(List.of(client));
+    realmManager.createOrUpdateUnmanagedClient(client);
     RoleRepresentation adminRole =
         realmManager
             .getRealmResource()
@@ -45,7 +45,7 @@ public final class ProvisioningClientBootstrapper {
   private static ClientRepresentation getProvisioningClientRepresentation(
       KeycloakProvisioningClientConfig provisioningClientConfig) {
     ClientRepresentation client = new ClientRepresentation();
-    client.setClientId(provisioningClientConfig.clientId().value());
+    client.setClientId(provisioningClientConfig.clientId());
     client.setSecret(provisioningClientConfig.secret());
     client.setAuthorizationServicesEnabled(false);
     client.setServiceAccountsEnabled(true);

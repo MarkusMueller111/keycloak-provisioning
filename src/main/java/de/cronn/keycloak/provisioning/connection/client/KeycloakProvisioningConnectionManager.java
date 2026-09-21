@@ -20,7 +20,7 @@ public final class KeycloakProvisioningConnectionManager extends KeycloakConnect
     this.keycloak =
         getDefaultKeycloakBuilder(serverUrl)
             .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
-            .clientId(config.clientId().value())
+            .clientId(config.clientId())
             .clientSecret(config.secret())
             .build();
     connect();
