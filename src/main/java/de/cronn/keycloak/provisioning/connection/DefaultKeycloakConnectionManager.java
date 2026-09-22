@@ -30,6 +30,7 @@ public final class DefaultKeycloakConnectionManager extends KeycloakConnectionMa
               config.serverUrl(), config.provisioningClientConfig(), config.clientNaming());
       bootstrapProvisioningClient(this.keycloakProvisioningConnectionManager, config);
     } catch (RuntimeException e) {
+      close();
       if (ExceptionUtils.indexOfType(e, NotAuthorizedException.class) == -1) {
         throw e;
       }
