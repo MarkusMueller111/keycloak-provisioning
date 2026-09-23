@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,14 +35,24 @@ public final class UserProfileConfig {
   private final Consumer<UPConfig> userProfileCustomizer;
 
   private UserProfileConfig(Builder builder) {
-    this.attributes =
-        builder.attributes == null ? BUILT_IN_ATTRIBUTES : List.copyOf(builder.attributes);
+    this.attributes = mergeOverBuiltIns(builder.attributes, builder.removedBuiltInAttributes);
     this.userProfileCustomizer =
         builder.userProfileCustomizer == null ? upConfig -> {} : builder.userProfileCustomizer;
   }
 
   public static Builder builder() {
     return new Builder();
+  }
+
+  private static List<AttributeConfig> mergeOverBuiltIns(
+      List<AttributeConfig> configured, Set<KeycloakProvidedUserAttribute> removed) {
+    Map<String, AttributeConfig> merged = new LinkedHashMap<>();
+    BUILT_IN_ATTRIBUTES.forEach(attribute -> merged.put(attribute.attributeName(), attribute));
+    if (configured != null) {
+      configured.forEach(attribute -> merged.put(attribute.attributeName(), attribute));
+    }
+    removed.forEach(attribute -> merged.remove(attribute.getAttributeName()));
+    return List.copyOf(merged.values());
   }
 
   /**
@@ -264,19 +275,34 @@ public final class UserProfileConfig {
 
   public static final class Builder {
     private List<AttributeConfig> attributes;
+    private Set<KeycloakProvidedUserAttribute> removedBuiltInAttributes = Set.of();
     private Consumer<UPConfig> userProfileCustomizer;
 
     private Builder() {}
 
     /**
-     * Replaces built-in default attributes with custom attributes list.
-     *
-     * <p>Use {@link UserProfileConfig#BUILT_IN_ATTRIBUTES} and extend it or build your own list
-     * using {@link AttributeConfig#defaultEmailBuilder()} and {@link
-     * AttributeConfig#defaultUsernameBuilder()} as a basis.
+     * Merged over {@link UserProfileConfig#BUILT_IN_ATTRIBUTES} by attribute name: a declared
+     * attribute overrides its built-in default, the rest keep theirs. Use {@link
+     * AttributeConfig#defaultEmailBuilder()} and friends as a basis when overriding one.
      */
     public Builder attributes(List<AttributeConfig> attributes) {
       this.attributes = attributes;
+      return this;
+    }
+
+    /**
+     * Drops built-in attributes rather than overriding them, applied after {@link
+     * #attributes(List)} regardless of call order.
+     */
+    public Builder withoutBuiltInAttributes(KeycloakProvidedUserAttribute... attributes) {
+      Set<KeycloakProvidedUserAttribute> removed = Set.of(attributes);
+      removed.forEach(
+          attribute ->
+              Validate.isTrue(
+                  attribute.isRemovable(),
+                  "Attribute '%s' cannot be removed: Keycloak requires it",
+                  attribute.getAttributeName()));
+      this.removedBuiltInAttributes = removed;
       return this;
     }
 

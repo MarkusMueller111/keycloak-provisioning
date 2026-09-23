@@ -102,6 +102,23 @@ deleted, what Keycloak created is returned to its default.
 | `configureUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
 | `reconcileBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
 
+### The user profile
+
+`UserProfileConfig` declares the realm's user-profile attributes. What you declare is merged over
+Keycloak's four built-ins by attribute name, so declaring one of your own keeps `username`,
+`email`, `firstName` and `lastName` as they were.
+
+```java
+UserProfileConfig.builder()
+    .attributes(List.of(AttributeConfig.builder("department").build()))
+    .withoutBuiltInAttributes(LAST_NAME)
+    .build();
+```
+
+`withoutBuiltInAttributes` drops a built-in rather than overriding it. Only `firstName` and
+`lastName` can go — Keycloak answers a profile without `username` or `email` with HTTP 400, and
+`build()` rejects the attempt.
+
 ### Keycloak's own clients
 
 `MasterRealmProvisioner` reconciles the six clients Keycloak creates in every realm. By default
