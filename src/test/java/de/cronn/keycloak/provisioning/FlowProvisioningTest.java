@@ -60,7 +60,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(
         realmManager -> {
           realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(FLOW, Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -71,11 +71,11 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(
         realmManager -> {
           realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(FLOW, Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
 
           AuthenticationExecutionInfoRepresentation required = execution("auth-cookie");
           required.setRequirement("REQUIRED");
-          realmManager.addOrUpdateExecutions(FLOW, Map.of(FLOW, List.of(required)));
+          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(required)));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -88,15 +88,15 @@ class FlowProvisioningTest extends SharedKeycloakTest {
         realmManager -> {
           realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
           realmManager.addOrUpdateExecutions(
-              FLOW, Map.of(FLOW, List.of(execution("auth-cookie"), execution("auth-otp-form"))));
+              Map.of(FLOW, List.of(execution("auth-cookie"), execution("auth-otp-form"))));
 
-          realmManager.addOrUpdateExecutions(FLOW, Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
         });
 
     withRealmManager(this::validateCustomFlows);
   }
 
-  /** A reorder moves the executions rather than deleting and re-adding them. */
+  /** The declared order is the desired order, and reordering moves rather than recreates. */
   @Test
   void reordersExecutionsWithoutRecreatingThem() {
     withRealmManager(
@@ -105,7 +105,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
           AuthenticationExecutionInfoRepresentation cookie = execution("auth-cookie");
           cookie.setRequirement("REQUIRED");
           realmManager.addOrUpdateExecutions(
-              FLOW, Map.of(FLOW, List.of(cookie, execution("auth-otp-form"))));
+              Map.of(FLOW, List.of(cookie, execution("auth-otp-form"))));
         });
 
     String idBeforeReorder = findExecution(FLOW, "auth-cookie").getId();
@@ -115,9 +115,10 @@ class FlowProvisioningTest extends SharedKeycloakTest {
           AuthenticationExecutionInfoRepresentation cookie = execution("auth-cookie");
           cookie.setRequirement("REQUIRED");
           realmManager.addOrUpdateExecutions(
-              FLOW, Map.of(FLOW, List.of(execution("auth-otp-form"), cookie)));
+              Map.of(FLOW, List.of(execution("auth-otp-form"), cookie)));
         });
 
+    assertThat(executionProviderIds(FLOW)).containsExactly("auth-otp-form", "auth-cookie");
     // Same execution, so its id survives and the requirement it carried is untouched.
     assertThat(findExecution(FLOW, "auth-cookie").getId()).isEqualTo(idBeforeReorder);
     assertThat(findExecution(FLOW, "auth-cookie").getRequirement()).isEqualTo("REQUIRED");
@@ -138,7 +139,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
               new LinkedHashMap<>();
           perSubFlow.put("sub-a", List.of(execution("auth-cookie")));
           perSubFlow.put("sub-b", List.of(execution("auth-otp-form")));
-          realmManager.addOrUpdateExecutions(FLOW, perSubFlow);
+          realmManager.addOrUpdateExecutions(perSubFlow);
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -160,6 +161,12 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     execution.setProviderId(providerId);
     execution.setRequirement("DISABLED");
     return execution;
+  }
+
+  private List<String> executionProviderIds(String flowAlias) {
+    return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
+        .map(AuthenticationExecutionInfoRepresentation::getProviderId)
+        .toList();
   }
 
   private List<String> flowAliases() {

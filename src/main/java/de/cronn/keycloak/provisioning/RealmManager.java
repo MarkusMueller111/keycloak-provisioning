@@ -488,12 +488,11 @@ public class RealmManager {
    * to; pass it as a key as well to configure its own executions.
    */
   public void addOrUpdateExecutions(
-      String parentFlow,
       Map<String, List<AuthenticationExecutionInfoRepresentation>> configuredExecutions) {
     configuredExecutions.forEach(
         (flowName, executions) -> {
+          // Keycloak orders executions by priority and derives the index from it on read.
           for (int i = 0; i < executions.size(); i++) {
-            executions.get(i).setIndex(i);
             executions.get(i).setPriority(i);
           }
 
