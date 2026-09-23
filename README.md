@@ -108,18 +108,24 @@ deleted, what Keycloak created is returned to its default.
 the flow each belongs to:
 
 ```java
-realmManager.configureFlows(List.of(browserFlow));
+realmManager.configureFlows(List.of(browserFlow, formsSubFlow));
 realmManager.addOrUpdateExecutions(Map.of(
-    "my-browser-flow", List.of(cookie, identityProviderRedirector),
-    "my-forms-subflow", List.of(usernamePasswordForm, otpForm)));
+    "my-browser-flow", List.of(
+        new Authenticator("auth-cookie", ALTERNATIVE),
+        new SubFlow("my-forms-subflow", "username, password and OTP", ALTERNATIVE)),
+    "my-forms-subflow", List.of(
+        new Authenticator("auth-username-password-form", REQUIRED),
+        new Authenticator("auth-otp-form", CONDITIONAL))));
 ```
 
 The order you declare executions in is the order they run in. An execution keeps its identity across
-runs — matched by provider id, or display name for a sub-flow — so reordering moves it rather than
-recreating it, and its configuration survives.
+runs, so reordering moves it rather than recreating it.
 
-Only an execution's `requirement` and position are reconciled. Keycloak takes display name and
-description from the authenticator itself.
+`FlowExecution` is a sealed type: an `Authenticator` names a provider id, a `SubFlow` names a flow
+that has to exist in its own right. It deliberately carries only what an execution update can
+actually write — the requirement and the position. Everything else Keycloak either derives from the
+flow tree or takes from the authenticator, so there is no customizer here; reach for
+`getRealmResource()` if you need more.
 
 ### The user profile
 
