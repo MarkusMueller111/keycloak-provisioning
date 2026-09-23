@@ -1,21 +1,20 @@
 package de.cronn.keycloak.provisioning.master;
 
-import static de.cronn.keycloak.provisioning.KeycloakProvidedClient.ACCOUNT;
 import static de.cronn.keycloak.provisioning.KeycloakProvidedClient.ADMIN_CLI;
 
+import de.cronn.keycloak.provisioning.BuiltInClientConfig;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.SecurityHeader;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
-import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
@@ -55,7 +54,7 @@ public class MasterRealmProvisioner {
   /** Runs all provisioning steps against the master realm, using the given config. */
   public void provision() {
     configureRealm();
-    disableUnusedClients();
+    reconcileBuiltInClients();
     configureRequiredActions();
     configureDefaultRealmRoleComposites();
     configureUserProfile();
@@ -99,26 +98,12 @@ public class MasterRealmProvisioner {
     realmManager.refreshToken();
   }
 
-  private void disableUnusedClients() {
-    Set<String> clientIdsToDisable = new LinkedHashSet<>(config.disabledClientIds());
+  private void reconcileBuiltInClients() {
+    List<BuiltInClientConfig> builtInClients = new ArrayList<>(config.builtInClients());
     if (config.disableAdminCliClient()) {
-      clientIdsToDisable.add(ADMIN_CLI.getClientId());
+      builtInClients.add(BuiltInClientConfig.forClient(ADMIN_CLI).enabled(false).build());
     }
-    realmManager.disableClients(clientIdsToDisable);
-
-    // Account client has to be enabled to access the account management console,
-    // but the standard flow should be disabled.
-    realmManager
-        .getClientByClientId(ACCOUNT.getClientId())
-        .ifPresent(
-            account -> {
-              ClientRepresentation representation = account.toRepresentation();
-              if (representation.isStandardFlowEnabled() == Boolean.TRUE) {
-                log.info("Disabling standard flow on '{}' client", ACCOUNT.getClientId());
-              }
-              representation.setStandardFlowEnabled(false);
-              account.update(representation);
-            });
+    realmManager.reconcileBuiltInClients(builtInClients);
   }
 
   /** Also covers admins created via {@code kc.sh bootstrap-admin}, which carry the same marker. */
