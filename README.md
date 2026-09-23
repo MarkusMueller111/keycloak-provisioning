@@ -121,6 +121,10 @@ realmManager.addOrUpdateExecutions(Map.of(
 The order you declare executions in is the order they run in. An execution keeps its identity across
 runs, so reordering moves it rather than recreating it.
 
+An execution is identified by its provider id, or by its name for a sub-flow, so the same
+authenticator cannot appear twice in one flow — there would be nothing to tell the two apart on the
+next run. Keycloak permits it; `addOrUpdateExecutions` rejects it before writing anything.
+
 `FlowExecution` is a sealed type: an `Authenticator` names a provider id, a `SubFlow` names a flow
 that has to exist in its own right. It deliberately carries only what an execution update can
 actually write — the requirement and the position. Everything else Keycloak either derives from the

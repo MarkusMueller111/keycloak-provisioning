@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -492,6 +493,7 @@ public class RealmManager {
         (flowName, flowExecutions) -> {
           List<AuthenticationExecutionInfoRepresentation> executions =
               toRepresentations(flowExecutions);
+          assertExecutionsAreDistinguishable(flowName, executions);
 
           // Re-read per flow: an earlier flow's changes are already applied, and getExecutions
           // returns the whole tree flattened, so it has to be narrowed to this flow's own level.
@@ -504,6 +506,24 @@ public class RealmManager {
           differ.getElementsToAdd().forEach(exe -> addExecution(exe, flowName));
           differ.getElementsToUpdate().forEach(exe -> updateExecution(exe, flowName));
         });
+  }
+
+  /**
+   * Keycloak allows the same authenticator twice in one flow, but this library cannot tell the two
+   * apart across runs: they share an identity, and the only thing separating them is their
+   * position, which is deliberately excluded so that a reorder is not a delete plus an add.
+   */
+  private static void assertExecutionsAreDistinguishable(
+      String flowName, List<AuthenticationExecutionInfoRepresentation> executions) {
+    Set<String> seen = new LinkedHashSet<>();
+    for (AuthenticationExecutionInfoRepresentation execution : executions) {
+      String id = AuthenticationExecutionRepresentationDiffer.id(execution);
+      Validate.isTrue(
+          seen.add(id),
+          "Flow '%s' declares '%s' more than once, which cannot be reconciled",
+          flowName,
+          id);
+    }
   }
 
   /** Keycloak orders executions by priority and derives the index from it on read. */

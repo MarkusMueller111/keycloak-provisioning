@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -204,6 +205,31 @@ class FlowProvisioningTest extends SharedKeycloakTest {
 
     assertThat(findExecution(FLOW, "auth-cookie").getRequirement()).isEqualTo("REQUIRED");
     assertThat(findSubFlow(FLOW, "auth-cookie").getAuthenticationFlow()).isTrue();
+  }
+
+  /**
+   * Keycloak permits it, but two identical executions cannot be told apart on the next run, so this
+   * fails before anything is written rather than silently recreating them each time.
+   */
+  @Test
+  void rejectsTheSameAuthenticatorTwiceInOneFlow() {
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    realmManager -> {
+                      realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+                      realmManager.addOrUpdateExecutions(
+                          Map.of(
+                              FLOW,
+                              List.of(
+                                  new FlowExecution.Authenticator("auth-cookie"),
+                                  new FlowExecution.Authenticator("auth-cookie"))));
+                    }))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining(FLOW)
+        .hasMessageContaining("auth-cookie");
+
+    assertThat(executionProviderIds(FLOW)).isEmpty();
   }
 
   private static AuthenticationFlowRepresentation flow(String alias, String description) {
