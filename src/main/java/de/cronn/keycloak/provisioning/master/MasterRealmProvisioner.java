@@ -147,9 +147,9 @@ public class MasterRealmProvisioner {
     }
 
     log.info("Creating permanent admin '{}'", username);
-    UserResource userResource = realmManager.createUser(user);
-    String userId = userResource.toRepresentation().getId();
+    String userId = realmManager.createUser(user);
     try {
+      UserResource userResource = realmManager.getUserResource(userId);
       realmManager.addRealmRoles(userResource, PermanentAdmin.realmRolesOf(user), username);
       permanentAdmin.afterCreate(userResource);
     } catch (RuntimeException e) {
