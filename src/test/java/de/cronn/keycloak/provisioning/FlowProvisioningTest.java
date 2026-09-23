@@ -73,8 +73,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
           realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
           realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
 
-          AuthenticationExecutionInfoRepresentation required = execution("auth-cookie");
-          required.setRequirement("REQUIRED");
+          FlowExecution required =
+              new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
           realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(required)));
         });
 
@@ -102,8 +102,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(
         realmManager -> {
           realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          AuthenticationExecutionInfoRepresentation cookie = execution("auth-cookie");
-          cookie.setRequirement("REQUIRED");
+          FlowExecution cookie =
+              new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
           realmManager.addOrUpdateExecutions(
               Map.of(FLOW, List.of(cookie, execution("auth-otp-form"))));
         });
@@ -112,8 +112,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
 
     withRealmManager(
         realmManager -> {
-          AuthenticationExecutionInfoRepresentation cookie = execution("auth-cookie");
-          cookie.setRequirement("REQUIRED");
+          FlowExecution cookie =
+              new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
           realmManager.addOrUpdateExecutions(
               Map.of(FLOW, List.of(execution("auth-otp-form"), cookie)));
         });
@@ -135,14 +135,33 @@ class FlowProvisioningTest extends SharedKeycloakTest {
                   flow("sub-a", "sub flow a"),
                   flow("sub-b", "sub flow b")));
 
-          Map<String, List<AuthenticationExecutionInfoRepresentation>> perSubFlow =
-              new LinkedHashMap<>();
+          Map<String, List<FlowExecution>> perSubFlow = new LinkedHashMap<>();
           perSubFlow.put("sub-a", List.of(execution("auth-cookie")));
           perSubFlow.put("sub-b", List.of(execution("auth-otp-form")));
           realmManager.addOrUpdateExecutions(perSubFlow);
         });
 
     withRealmManager(this::validateCustomFlows);
+  }
+
+  /** A sub-flow comes back named by displayName, so matching it again is the fragile part. */
+  @Test
+  void nestsASubFlowAndKeepsItAcrossRuns() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.addOrUpdateExecutions(
+              Map.of(FLOW, List.of(new FlowExecution.SubFlow("nested", "a nested flow", null))));
+        });
+
+    String idAfterFirstRun = findSubFlow(FLOW, "nested").getId();
+
+    withRealmManager(
+        realmManager ->
+            realmManager.addOrUpdateExecutions(
+                Map.of(FLOW, List.of(new FlowExecution.SubFlow("nested", "a nested flow", null)))));
+
+    assertThat(findSubFlow(FLOW, "nested").getId()).isEqualTo(idAfterFirstRun);
   }
 
   private static AuthenticationFlowRepresentation flow(String alias, String description) {
@@ -155,12 +174,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     return flow;
   }
 
-  private static AuthenticationExecutionInfoRepresentation execution(String providerId) {
-    AuthenticationExecutionInfoRepresentation execution =
-        new AuthenticationExecutionInfoRepresentation();
-    execution.setProviderId(providerId);
-    execution.setRequirement("DISABLED");
-    return execution;
+  private static FlowExecution execution(String providerId) {
+    return new FlowExecution.Authenticator(providerId);
   }
 
   private List<String> executionProviderIds(String flowAlias) {
@@ -178,6 +193,14 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   private AuthenticationFlowRepresentation findFlow(String alias) {
     return adminClient().realm(REALM).flows().getFlows().stream()
         .filter(f -> alias.equals(f.getAlias()))
+        .findFirst()
+        .orElseThrow();
+  }
+
+  private AuthenticationExecutionInfoRepresentation findSubFlow(
+      String flowAlias, String displayName) {
+    return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
+        .filter(e -> displayName.equals(e.getDisplayName()))
         .findFirst()
         .orElseThrow();
   }

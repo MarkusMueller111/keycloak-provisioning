@@ -487,14 +487,11 @@ public class RealmManager {
    * execution missing from it is removed. {@code parentFlow} is only the flow the sub-flows belong
    * to; pass it as a key as well to configure its own executions.
    */
-  public void addOrUpdateExecutions(
-      Map<String, List<AuthenticationExecutionInfoRepresentation>> configuredExecutions) {
+  public void addOrUpdateExecutions(Map<String, List<FlowExecution>> configuredExecutions) {
     configuredExecutions.forEach(
-        (flowName, executions) -> {
-          // Keycloak orders executions by priority and derives the index from it on read.
-          for (int i = 0; i < executions.size(); i++) {
-            executions.get(i).setPriority(i);
-          }
+        (flowName, flowExecutions) -> {
+          List<AuthenticationExecutionInfoRepresentation> executions =
+              toRepresentations(flowExecutions);
 
           // Re-read per flow: an earlier flow's changes are already applied, and getExecutions
           // returns the whole tree flattened, so it has to be narrowed to this flow's own level.
@@ -507,6 +504,36 @@ public class RealmManager {
           differ.getElementsToAdd().forEach(exe -> addExecution(exe, flowName));
           differ.getElementsToUpdate().forEach(exe -> updateExecution(exe, flowName));
         });
+  }
+
+  /** Keycloak orders executions by priority and derives the index from it on read. */
+  private static List<AuthenticationExecutionInfoRepresentation> toRepresentations(
+      List<FlowExecution> flowExecutions) {
+    List<AuthenticationExecutionInfoRepresentation> representations = new ArrayList<>();
+    for (int priority = 0; priority < flowExecutions.size(); priority++) {
+      representations.add(toRepresentation(flowExecutions.get(priority), priority));
+    }
+    return representations;
+  }
+
+  private static AuthenticationExecutionInfoRepresentation toRepresentation(
+      FlowExecution flowExecution, int priority) {
+    AuthenticationExecutionInfoRepresentation representation =
+        new AuthenticationExecutionInfoRepresentation();
+    representation.setRequirement(flowExecution.requirement().name());
+    representation.setPriority(priority);
+    switch (flowExecution) {
+      case FlowExecution.Authenticator authenticator ->
+          representation.setProviderId(authenticator.providerId());
+      case FlowExecution.SubFlow subFlow -> {
+        representation.setAuthenticationFlow(Boolean.TRUE);
+        representation.setAlias(subFlow.alias());
+        representation.setDisplayName(subFlow.alias());
+        representation.setDescription(subFlow.description());
+        representation.setProviderId("registration-page-form");
+      }
+    }
+    return representation;
   }
 
   /** Executions directly on {@code flowAlias}, without those of its sub-flows. */
@@ -570,8 +597,9 @@ public class RealmManager {
       AuthenticationExecutionInfoRepresentation execution, String parentFlow) {
     return directExecutionsOf(parentFlow).stream()
         .filter(
-            exec -> // Subflows do not have a provider id
-            Objects.equals(exec.getProviderId(), execution.getProviderId())
+            exec ->
+                Objects.equals(exec.getProviderId(), execution.getProviderId())
+                    // A sub-flow comes back named by displayName, not by the alias that created it.
                     || Objects.equals(exec.getDisplayName(), execution.getAlias()))
         .reduce((first, second) -> second)
         .orElseThrow();
