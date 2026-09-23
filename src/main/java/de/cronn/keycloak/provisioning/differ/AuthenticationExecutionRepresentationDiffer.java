@@ -27,15 +27,17 @@ public class AuthenticationExecutionRepresentationDiffer
   }
 
   /**
-   * Sub-flows carry no provider id, and executions carry no alias, so the two are named
-   * differently. The position is deliberately not part of this: an execution that moved is the same
-   * execution, and including its index would make every reorder a delete plus an add.
+   * What makes two executions the same one. A sub-flow may be named after an authenticator, so the
+   * kind is part of it — comparing names alone would confuse the two. A sub-flow execution has no
+   * provider id of its own; it is named after the flow it points at.
+   *
+   * <p>The position deliberately is not: an execution that moved is the same execution, and
+   * including its index would make every reorder a delete plus an add.
    */
-  private static String id(AuthenticationExecutionInfoRepresentation execution) {
-    if (execution.getAuthenticationFlow() == Boolean.TRUE) {
-      return execution.getDisplayName() != null ? execution.getDisplayName() : execution.getAlias();
-    }
-    return execution.getProviderId();
+  public static String id(AuthenticationExecutionInfoRepresentation execution) {
+    return execution.getAuthenticationFlow() == Boolean.TRUE
+        ? "sub-flow " + execution.getDisplayName()
+        : "authenticator " + execution.getProviderId();
   }
 
   public AuthenticationExecutionRepresentationDiffer(
