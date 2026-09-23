@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.AuthenticationManagementConfig;
+import de.cronn.keycloak.provisioning.BuiltInClientConfig;
 import de.cronn.keycloak.provisioning.KeycloakProvidedClient;
 import de.cronn.keycloak.provisioning.KeycloakProvidedRequiredAction;
 import de.cronn.keycloak.provisioning.SecurityHeader;
@@ -8,6 +9,7 @@ import de.cronn.keycloak.provisioning.UserProfileConfig;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -43,7 +45,7 @@ public final class MasterRealmConfig {
   private final Duration sessionMaxLifespan;
   private final boolean bruteForceProtected;
   private final Map<SecurityHeader, String> securityHeaders;
-  private final Set<String> disabledClientIds;
+  private final List<BuiltInClientConfig> builtInClients;
   private final boolean disableAdminCliClient;
   private final boolean deleteTemporaryAdminUsers;
   private final Duration adminEventsExpiration;
@@ -67,11 +69,7 @@ public final class MasterRealmConfig {
         builder.securityHeaders == null
             ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
             : Map.copyOf(builder.securityHeaders);
-    this.disabledClientIds =
-        unmodifiableOrdered(
-            builder.disabledClientIds == null
-                ? defaultDisabledClientIds()
-                : builder.disabledClientIds);
+    this.builtInClients = mergeOverDefaults(builder.builtInClients);
     this.disableAdminCliClient = builder.disableAdminCliClient;
     this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
     this.adminEventsExpiration =
@@ -124,12 +122,33 @@ public final class MasterRealmConfig {
             + " would silently keep the initial password in place forever.");
   }
 
-  /** Client IDs disabled by default unless overridden via {@link Builder#disabledClientIds}. */
-  public static Set<String> defaultDisabledClientIds() {
-    return new LinkedHashSet<>(
-        KeycloakProvidedClient.DISABLED_BY_DEFAULT.stream()
-            .map(KeycloakProvidedClient::getClientId)
-            .toList());
+  private static List<BuiltInClientConfig> mergeOverDefaults(List<BuiltInClientConfig> configured) {
+    assertBuiltInClientsAreValid(configured);
+    Map<KeycloakProvidedClient, BuiltInClientConfig> merged = new LinkedHashMap<>();
+    BuiltInClientConfig.BUILT_IN_CLIENT_DEFAULTS.forEach(
+        config -> merged.put(config.client(), config));
+    if (configured != null) {
+      configured.forEach(config -> merged.put(config.client(), config));
+    }
+    return List.copyOf(merged.values());
+  }
+
+  private static void assertBuiltInClientsAreValid(List<BuiltInClientConfig> configured) {
+    if (configured == null) {
+      return;
+    }
+    Set<KeycloakProvidedClient> seen = new LinkedHashSet<>();
+    for (BuiltInClientConfig config : configured) {
+      Validate.isTrue(
+          seen.add(config.client()),
+          "Client '%s' is configured more than once",
+          config.client().getClientId());
+      // Keycloak answers a disable with 403, so this would fail mid-provisioning instead.
+      Validate.isTrue(
+          config.client() != KeycloakProvidedClient.REALM_MANAGEMENT || config.enabled(),
+          "Client '%s' cannot be disabled: it backs the realm's admin permissions",
+          config.client().getClientId());
+    }
   }
 
   /** Default role composites unless overridden via {@link Builder#defaultRoleComposites}. */
@@ -181,10 +200,10 @@ public final class MasterRealmConfig {
   }
 
   /**
-   * @see Builder#disabledClientIds
+   * @see Builder#builtInClients
    */
-  public Set<String> disabledClientIds() {
-    return disabledClientIds;
+  public List<BuiltInClientConfig> builtInClients() {
+    return builtInClients;
   }
 
   /**
@@ -256,7 +275,7 @@ public final class MasterRealmConfig {
     private Duration sessionMaxLifespan;
     private boolean bruteForceProtected = true;
     private Map<SecurityHeader, String> securityHeaders;
-    private Set<String> disabledClientIds;
+    private List<BuiltInClientConfig> builtInClients;
     private boolean disableAdminCliClient = true;
     private boolean deleteTemporaryAdminUsers = true;
     private Duration adminEventsExpiration;
@@ -300,25 +319,13 @@ public final class MasterRealmConfig {
       return this;
     }
 
-    /** Client IDs that are (to be) disabled in the master realm */
-    public Builder disabledClientIds(Collection<String> disabledClientIds) {
-      this.disabledClientIds = new LinkedHashSet<>(disabledClientIds);
-      return this;
-    }
-
-    public Builder addDisabledClientIds(Collection<String> additionalDisabledClientIds) {
-      if (this.disabledClientIds == null) {
-        this.disabledClientIds = defaultDisabledClientIds();
-      }
-      this.disabledClientIds.addAll(additionalDisabledClientIds);
-      return this;
-    }
-
-    public Builder removeDisabledClientId(String exceptedDisabledClientId) {
-      if (this.disabledClientIds == null) {
-        this.disabledClientIds = defaultDisabledClientIds();
-      }
-      this.disabledClientIds.remove(exceptedDisabledClientId);
+    /**
+     * Configuration for Keycloak's own clients, merged over {@link
+     * BuiltInClientConfig#BUILT_IN_CLIENT_DEFAULTS} per client: a declared client overrides its
+     * default, every other keeps it. A built-in mentioned by neither is reconciled to enabled.
+     */
+    public Builder builtInClients(List<BuiltInClientConfig> builtInClients) {
+      this.builtInClients = builtInClients;
       return this;
     }
 
@@ -329,7 +336,7 @@ public final class MasterRealmConfig {
      *
      * <p>Set to {@code false} when provisioning connects via {@code
      * KeycloakAdminCliConnectionManager} and relies on {@code admin-cli} as a fallback. It is a
-     * separate option rather than part of {@link #disabledClientIds} because that makes it a
+     * separate option rather than part of {@link #builtInClients(java.util.List)} because that
      * statement about the provisioning connection, not about client hardening.
      */
     public Builder disableAdminCliClient(boolean disableAdminCliClient) {

@@ -89,18 +89,41 @@ the underlying `jakarta.ws.rs` exception as cause.
 ## Reconciling
 
 The methods below take the **full desired state**. Anything they manage that is missing from what
-you pass is deleted, so repeated runs converge on your configuration — and an incomplete list is
-destructive.
+you pass is reset, so repeated runs converge on your configuration — and an incomplete list is
+destructive. What "reset" means depends on who owns the object: what this library created is
+deleted, what Keycloak created is returned to its default.
 
-| Method | Deletes |
+| Method | What it resets |
 |---|---|
-| `createOrUpdateClients` | every client whose id carries the configured prefix (`system-` by default) and is not in the list |
-| `configureFlows` | every flow that is not one of Keycloak's built-ins and is not in the list — **including flows created by hand in the admin console** |
-| `addOrUpdateExecutions` | every execution of the named flows that is not in the list |
-| `reconcileDefaultRoleComposites` | every composite of the realm's default role not in the list |
-| `configureUserProfile` | every user-profile attribute not declared and not a Keycloak built-in |
+| `createOrUpdateClients` | deletes every client whose id carries the configured prefix (`system-` by default) and is not in the list |
+| `configureFlows` | deletes every flow that is not one of Keycloak's built-ins and is not in the list — **including flows created by hand in the admin console** |
+| `addOrUpdateExecutions` | deletes every execution of the named flows that is not in the list |
+| `reconcileDefaultRoleComposites` | removes every composite of the realm's default role not in the list |
+| `configureUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
+| `reconcileBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
 
-`disableClients` is the exception: it disables what you name and touches nothing else.
+### Keycloak's own clients
+
+`MasterRealmProvisioner` reconciles the six clients Keycloak creates in every realm. By default
+`broker` is disabled and `account` keeps its standard flow off; everything else stays enabled.
+
+```java
+MasterRealmConfig.builder(url, permanentAdmin)
+    .builtInClients(List.of(
+        BuiltInClientConfig.forClient(SECURITY_ADMIN_CONSOLE).enabled(false).build()))
+    .build();
+```
+
+What you declare is merged over those defaults per client, so the example above leaves `broker` and
+`account` as they were. These clients are never created or deleted, only adjusted: one you do not
+configure stays exactly as Keycloak made it.
+
+`enabled` is written on every run, so dropping an entry re-enables its client — that is what makes
+the configuration reversible. A `customizer` is applied as a delta and is **not** reverted when you
+remove it, because there is no way to know what Keycloak's value for that field would have been. Set
+the opposite explicitly to undo one.
+
+`realm-management` cannot be disabled — Keycloak refuses it, and `build()` rejects the attempt.
 
 ### Client naming
 

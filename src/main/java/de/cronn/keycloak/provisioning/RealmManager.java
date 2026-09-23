@@ -5,6 +5,7 @@ import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
+import de.cronn.keycloak.provisioning.differ.Differ;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
@@ -109,7 +110,7 @@ public class RealmManager {
    * Reconciles the realm roles composed into the realm's default role (i.e. granted to every user)
    * to exactly match {@code roleNames}: adds missing ones, removes any composite realm role not
    * listed. {@code roleNames} is treated as the full desired set, the same "declare it all"
-   * semantics as {@link MasterRealmConfig#disabledClientIds()}. Safe to call repeatedly.
+   * semantics as {@link MasterRealmConfig#builtInClients()}. Safe to call repeatedly.
    */
   public void reconcileDefaultRoleComposites(Collection<String> roleNames) {
     RealmResource realm = getRealmResource();
@@ -142,15 +143,41 @@ public class RealmManager {
     }
   }
 
-  public void disableClients(Collection<String> clientIds) {
+  /**
+   * Reconciles Keycloak's own clients: what {@code builtInClients} declares is applied, every other
+   * built-in is reset to enabled. Removing an entry therefore undoes it. Clients this library or a
+   * consumer provisioned are out of scope, those belong to {@link #createOrUpdateClients(List)}.
+   */
+  public void reconcileBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
+    Map<KeycloakProvidedClient, BuiltInClientConfig> byClient =
+        builtInClients.stream()
+            .collect(Collectors.toMap(BuiltInClientConfig::client, config -> config));
+
     ClientsResource clientsResource = getRealmResource().clients();
-    List<ClientRepresentation> clients = clientsResource.findAll();
-    for (ClientRepresentation client : clients) {
-      if (clientIds.contains(client.getClientId()) && client.isEnabled() == Boolean.TRUE) {
-        log.info("Disabling default client '{}'", client.getClientId());
-        client.setEnabled(false);
-        clientsResource.get(client.getId()).update(client);
+    Map<String, ClientRepresentation> existingByClientId =
+        clientsResource.findAll().stream()
+            .collect(Collectors.toMap(ClientRepresentation::getClientId, client -> client));
+
+    for (KeycloakProvidedClient builtIn : KeycloakProvidedClient.values()) {
+      ClientRepresentation client = existingByClientId.get(builtIn.getClientId());
+      if (client == null) {
+        continue;
       }
+      BuiltInClientConfig config =
+          byClient.getOrDefault(builtIn, BuiltInClientConfig.forClient(builtIn).build());
+
+      String before = AbstractDiffer.toJson(client);
+      config.applyTo(client);
+      String after = AbstractDiffer.toJson(client);
+      if (before.equals(after)) {
+        continue;
+      }
+
+      log.info(
+          "Built-in client '{}' requires an update:\n{}",
+          builtIn.getClientId(),
+          Differ.calculateMultilineDiff(before, after));
+      clientsResource.get(client.getId()).update(client);
     }
   }
 
@@ -412,7 +439,7 @@ public class RealmManager {
    * Reconciles the realm's authentication flows to exactly match {@code flows}: adds missing ones,
    * updates existing ones, and deletes any flow no longer listed. {@code flows} is treated as the
    * full desired set, the same "declare it all" semantics as {@link
-   * MasterRealmConfig#disabledClientIds()}. Keycloak's own flows are never touched, so only flows
+   * MasterRealmConfig#builtInClients()}. Keycloak's own flows are never touched, so only flows
    * created outside this call are at risk of deletion. Safe to call repeatedly.
    */
   public void configureFlows(List<AuthenticationFlowRepresentation> flows) {

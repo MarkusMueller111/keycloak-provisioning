@@ -46,7 +46,14 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
   void disablesTheAccountClientWhenItIsExplicitlyListed() {
     provision(
         configBuilder(PermanentAdmin.none())
-            .addDisabledClientIds(List.of("account", "account-console"))
+            .builtInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
+                        .enabled(false)
+                        .build(),
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT_CONSOLE)
+                        .enabled(false)
+                        .build()))
             .build());
 
     assertThat(masterClient("account").isEnabled()).isFalse();

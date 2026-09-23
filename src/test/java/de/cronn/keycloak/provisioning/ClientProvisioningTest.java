@@ -64,11 +64,48 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void disablesOnlyTheRequestedClients() {
-    withRealmManager(realmManager -> realmManager.disableClients(List.of("account")));
+  void disablesOnlyTheRequestedBuiltInClients() {
+    withRealmManager(
+        realmManager ->
+            realmManager.reconcileBuiltInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
+                        .enabled(false)
+                        .build())));
 
     assertThat(findClient("account").isEnabled()).isFalse();
     assertThat(findClient("account-console").isEnabled()).isTrue();
+  }
+
+  /** Dropping an entry has to undo it, which a one-way disable could not. */
+  @Test
+  void reEnablesABuiltInClientThatIsNoLongerDisabled() {
+    withRealmManager(
+        realmManager ->
+            realmManager.reconcileBuiltInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
+                        .enabled(false)
+                        .build())));
+    assertThat(findClient("account").isEnabled()).isFalse();
+
+    withRealmManager(realmManager -> realmManager.reconcileBuiltInClients(List.of()));
+
+    assertThat(findClient("account").isEnabled()).isTrue();
+  }
+
+  /** Keycloak creates one <realm>-realm client per realm, so it is not a fixed built-in. */
+  @Test
+  void keycloakProvidedClientCoversEveryBuiltInClientOfAFreshRealm() {
+    List<String> builtInIds =
+        clientIds().stream().filter(id -> !id.equals(REALM + "-realm")).sorted().toList();
+
+    assertThat(builtInIds)
+        .containsExactlyElementsOf(
+            java.util.Arrays.stream(KeycloakProvidedClient.values())
+                .map(KeycloakProvidedClient::getClientId)
+                .sorted()
+                .toList());
   }
 
   /** A custom naming has to reach the deletion fence, not just the ids it mints. */
