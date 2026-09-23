@@ -527,10 +527,11 @@ public class RealmManager {
           representation.setProviderId(authenticator.providerId());
       case FlowExecution.SubFlow subFlow -> {
         representation.setAuthenticationFlow(Boolean.TRUE);
+        // alias creates the nested flow; displayName is how Keycloak reports it back, so setting
+        // both makes the desired and the existing side comparable without a fallback.
         representation.setAlias(subFlow.alias());
         representation.setDisplayName(subFlow.alias());
         representation.setDescription(subFlow.description());
-        representation.setProviderId("registration-page-form");
       }
     }
     return representation;
@@ -577,8 +578,6 @@ public class RealmManager {
                   execution.getAlias(),
                   "description",
                   execution.getDescription() == null ? "" : execution.getDescription(),
-                  "provider",
-                  execution.getProviderId(),
                   "type",
                   "basic-flow"));
     } else {
@@ -598,9 +597,8 @@ public class RealmManager {
     return directExecutionsOf(parentFlow).stream()
         .filter(
             exec ->
-                Objects.equals(exec.getProviderId(), execution.getProviderId())
-                    // A sub-flow comes back named by displayName, not by the alias that created it.
-                    || Objects.equals(exec.getDisplayName(), execution.getAlias()))
+                AuthenticationExecutionRepresentationDiffer.id(exec)
+                    .equals(AuthenticationExecutionRepresentationDiffer.id(execution)))
         .reduce((first, second) -> second)
         .orElseThrow();
   }

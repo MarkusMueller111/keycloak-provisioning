@@ -164,6 +164,48 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(findSubFlow(FLOW, "nested").getId()).isEqualTo(idAfterFirstRun);
   }
 
+  /** Two sub-flows share a null provider id, so they must be told apart by name. */
+  @Test
+  void keepsTwoSubFlowsOfTheSameParentApart() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.addOrUpdateExecutions(
+              Map.of(
+                  FLOW,
+                  List.of(
+                      new FlowExecution.SubFlow(
+                          "first-sub", "a", FlowExecution.Requirement.REQUIRED),
+                      new FlowExecution.SubFlow(
+                          "second-sub", "b", FlowExecution.Requirement.DISABLED))));
+        });
+
+    assertThat(findSubFlow(FLOW, "first-sub").getRequirement()).isEqualTo("REQUIRED");
+    assertThat(findSubFlow(FLOW, "second-sub").getRequirement()).isEqualTo("DISABLED");
+  }
+
+  /**
+   * A sub-flow may be named after an authenticator; the two must not be mistaken for each other.
+   */
+  @Test
+  void tellsASubFlowApartFromAnAuthenticatorOfTheSameName() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.addOrUpdateExecutions(
+              Map.of(
+                  FLOW,
+                  List.of(
+                      new FlowExecution.Authenticator(
+                          "auth-cookie", FlowExecution.Requirement.REQUIRED),
+                      new FlowExecution.SubFlow(
+                          "auth-cookie", "a sub-flow of the same name", null))));
+        });
+
+    assertThat(findExecution(FLOW, "auth-cookie").getRequirement()).isEqualTo("REQUIRED");
+    assertThat(findSubFlow(FLOW, "auth-cookie").getAuthenticationFlow()).isTrue();
+  }
+
   private static AuthenticationFlowRepresentation flow(String alias, String description) {
     AuthenticationFlowRepresentation flow = new AuthenticationFlowRepresentation();
     flow.setAlias(alias);
