@@ -354,12 +354,11 @@ public class RealmManager {
     return getRealmResource().users().searchByAttributes("is_temporary_admin:true");
   }
 
-  public UserResource createUser(UserRepresentation userRepresentation) {
+  public String createUser(UserRepresentation userRepresentation) {
     return createUser(getRealmResource().users(), userRepresentation);
   }
 
-  public UserResource createUser(
-      UsersResource usersResource, UserRepresentation userRepresentation) {
+  public String createUser(UsersResource usersResource, UserRepresentation userRepresentation) {
     try (Response response = usersResource.create(userRepresentation)) {
       int status = response.getStatus();
       if (status == Response.Status.CONFLICT.getStatusCode()) {
@@ -368,8 +367,7 @@ public class RealmManager {
       if (response.getStatusInfo().getFamily() != Response.Status.Family.SUCCESSFUL) {
         throw new KeycloakException(failureMessage(status));
       }
-      String userId = CreatedResponseUtil.getCreatedId(response);
-      return getUserResource(userId);
+      return CreatedResponseUtil.getCreatedId(response);
     }
   }
 
