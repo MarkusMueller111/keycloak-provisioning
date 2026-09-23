@@ -102,6 +102,25 @@ deleted, what Keycloak created is returned to its default.
 | `configureUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
 | `reconcileBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
 
+### Authentication flows
+
+`configureFlows` declares the realm's flows and `addOrUpdateExecutions` their executions, keyed by
+the flow each belongs to:
+
+```java
+realmManager.configureFlows(List.of(browserFlow));
+realmManager.addOrUpdateExecutions(Map.of(
+    "my-browser-flow", List.of(cookie, identityProviderRedirector),
+    "my-forms-subflow", List.of(usernamePasswordForm, otpForm)));
+```
+
+The order you declare executions in is the order they run in. An execution keeps its identity across
+runs — matched by provider id, or display name for a sub-flow — so reordering moves it rather than
+recreating it, and its configuration survives.
+
+Only an execution's `requirement` and position are reconciled. Keycloak takes display name and
+description from the authenticator itself.
+
 ### The user profile
 
 `UserProfileConfig` declares the realm's user-profile attributes. What you declare is merged over
