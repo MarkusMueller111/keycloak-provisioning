@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning.testsupport;
 
 import de.cronn.keycloak.provisioning.RealmManager;
+import de.cronn.keycloak.provisioning.Usernames;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserRepresentationDiffer;
 import java.util.List;
@@ -43,8 +44,12 @@ public final class TestUserProvisioner {
    *
    * <p>Credentials a user carries are applied on every run: Keycloak never returns their value, so
    * there is no way to tell whether they still match.
+   *
+   * <p>Usernames have to be lower-case — see {@link Usernames#requireLowerCase(String)}.
    */
   public void createOrUpdateUsers(List<UserRepresentation> users) {
+    users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
+
     List<UserRepresentation> existingUsers =
         users.stream()
             .map(UserRepresentation::getUsername)
