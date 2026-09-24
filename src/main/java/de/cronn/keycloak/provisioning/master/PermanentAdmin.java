@@ -2,8 +2,8 @@ package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
+import de.cronn.keycloak.provisioning.Usernames;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.Validate;
@@ -36,21 +36,6 @@ public sealed interface PermanentAdmin {
   void afterCreate(UserResource userResource);
 
   /**
-   * Keycloak stores usernames lower-cased, so a mixed-case one would not be the name the realm
-   * actually holds — and an application comparing its own configuration against a token's {@code
-   * preferred_username} would find them different. Rejected rather than lower-cased silently, so
-   * the configuration says what the realm will contain.
-   */
-  static String requireLowerCaseUsername(String username) {
-    Validate.notBlank(username, "username must not be blank");
-    Validate.isTrue(
-        username.equals(username.toLowerCase(Locale.ROOT)),
-        "username must be lower-case, since Keycloak stores it that way, but was '%s'",
-        username);
-    return username;
-  }
-
-  /**
    * No standing human admin. Together with the default {@code deleteTemporaryAdminUsers(true)} the
    * realm is left without administrative access by design; create one on demand via {@code kc.sh
    * bootstrap-admin user}.
@@ -66,12 +51,12 @@ public sealed interface PermanentAdmin {
    *
    * <p>{@code initialPassword} has to satisfy the realm's {@link
    * MasterRealmConfig#passwordPolicy()}, and {@code username} has to be lower-case — see {@link
-   * #requireLowerCaseUsername(String)}.
+   * Usernames#requireLowerCase(String)}.
    */
   record Standard(String username, String initialPassword, String email) implements PermanentAdmin {
 
     public Standard {
-      requireLowerCaseUsername(username);
+      Usernames.requireLowerCase(username);
       Validate.notBlank(initialPassword, "initialPassword must not be blank");
     }
 
@@ -112,7 +97,7 @@ public sealed interface PermanentAdmin {
     public UserRepresentation buildUser() {
       UserRepresentation userRepresentation =
           Objects.requireNonNull(user, "user must not supply null");
-      requireLowerCaseUsername(userRepresentation.getUsername());
+      Usernames.requireLowerCase(userRepresentation.getUsername());
       return userRepresentation;
     }
 

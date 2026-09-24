@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
@@ -70,6 +71,21 @@ class UserProvisioningTest extends SharedKeycloakTest {
     withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(alice)));
 
     assertThat(credentialTypes("alice")).contains(CredentialRepresentation.PASSWORD);
+  }
+
+  /**
+   * Keycloak lower-cases the stored name, so reconciliation would compare the configured spelling
+   * against it, take the user for unmanaged and delete the account it had just created.
+   */
+  @Test
+  void rejectsAMixedCaseUsername() {
+    assertThatThrownBy(
+            () -> withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("Alice")))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("lower-case")
+        .hasMessageContaining("Alice");
+
+    assertThat(usernames()).doesNotContain("alice", "Alice");
   }
 
   private void withTestUserProvisioner(Consumer<TestUserProvisioner> action) {
