@@ -29,7 +29,7 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setAttributes(source.getAttributes());
       target.setEnabled(source.isEnabled());
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
-      // so RealmManager reconciles them through the dedicated endpoints afterwards.
+      // so RealmManager provisions them through the dedicated endpoints afterwards.
     };
   }
 

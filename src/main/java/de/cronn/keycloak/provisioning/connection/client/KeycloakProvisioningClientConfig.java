@@ -6,7 +6,7 @@ import org.apache.commons.lang3.Validate;
 /**
  * The client this library authenticates as. Its id deliberately carries no managed prefix: it is
  * created once at bootstrap and is not part of any realm's desired state, so keeping it outside the
- * managed namespace is what stops a consumer's own client reconciliation from deleting it.
+ * managed namespace is what stops a consumer's own client provisioning from deleting it.
  */
 public record KeycloakProvisioningClientConfig(
     String clientId, String secret, String name, String description) {

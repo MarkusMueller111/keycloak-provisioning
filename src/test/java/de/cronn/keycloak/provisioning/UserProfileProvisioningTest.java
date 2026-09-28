@@ -14,7 +14,7 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
   void keepsTheBuiltInAttributesWhenACustomOneIsDeclared() {
     withRealmManager(
         realmManager ->
-            realmManager.configureUserProfile(
+            realmManager.provisionUserProfile(
                 UserProfileConfig.builder()
                     .attributes(
                         List.of(UserProfileConfig.AttributeConfig.builder("department").build()))
@@ -28,7 +28,7 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
   void dropsABuiltInAttributeKeycloakAllowsToBeRemoved() {
     withRealmManager(
         realmManager ->
-            realmManager.configureUserProfile(
+            realmManager.provisionUserProfile(
                 UserProfileConfig.builder()
                     .withoutBuiltInAttributes(KeycloakProvidedUserAttribute.LAST_NAME)
                     .build()));

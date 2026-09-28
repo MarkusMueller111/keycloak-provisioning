@@ -20,7 +20,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void createsTheConfiguredClients() {
     withRealmManager(
         realmManager -> {
-          realmManager.createOrUpdateClients(List.of(client("system-a"), client("system-b")));
+          realmManager.provisionManagedClients(List.of(client("system-a"), client("system-b")));
 
           validateClients(realmManager);
         });
@@ -31,9 +31,9 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void deletesSystemClientsThatAreNoLongerConfigured() {
     withRealmManager(
         realmManager -> {
-          realmManager.createOrUpdateClients(List.of(client("system-a"), client("system-b")));
+          realmManager.provisionManagedClients(List.of(client("system-a"), client("system-b")));
 
-          realmManager.createOrUpdateClients(List.of(client("system-a")));
+          realmManager.provisionManagedClients(List.of(client("system-a")));
         });
 
     assertThat(systemClientIds()).containsExactly("system-a");
@@ -44,7 +44,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     adminClient().realm(REALM).clients().create(client("unmanaged")).close();
 
     withRealmManager(
-        realmManager -> realmManager.createOrUpdateClients(List.of(client("system-a"))));
+        realmManager -> realmManager.provisionManagedClients(List.of(client("system-a"))));
 
     assertThat(clientIds()).contains("unmanaged", "system-a");
   }
@@ -53,11 +53,11 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void updatesAnExistingClientInPlace() {
     withRealmManager(
         realmManager -> {
-          realmManager.createOrUpdateClients(List.of(client("system-a")));
+          realmManager.provisionManagedClients(List.of(client("system-a")));
 
           ClientRepresentation renamed = client("system-a");
           renamed.setName("renamed");
-          realmManager.createOrUpdateClients(List.of(renamed));
+          realmManager.provisionManagedClients(List.of(renamed));
         });
 
     assertThat(findClient("system-a").getName()).isEqualTo("renamed");
@@ -67,7 +67,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void disablesOnlyTheRequestedBuiltInClients() {
     withRealmManager(
         realmManager ->
-            realmManager.reconcileBuiltInClients(
+            realmManager.provisionBuiltInClients(
                 List.of(
                     BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
                         .enabled(false)
@@ -77,14 +77,16 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account-console").isEnabled()).isTrue();
   }
 
-  /** Reported before the first write, so a contradiction cannot leave the realm half reconciled. */
+  /**
+   * Reported before the first write, so a contradiction cannot leave the realm half provisioned.
+   */
   @Test
   void rejectsTheSameBuiltInClientTwice() {
     assertThatThrownBy(
             () ->
                 withRealmManager(
                     realmManager ->
-                        realmManager.reconcileBuiltInClients(
+                        realmManager.provisionBuiltInClients(
                             List.of(
                                 BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
                                     .enabled(false)
@@ -103,14 +105,14 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void reEnablesABuiltInClientThatIsNoLongerDisabled() {
     withRealmManager(
         realmManager ->
-            realmManager.reconcileBuiltInClients(
+            realmManager.provisionBuiltInClients(
                 List.of(
                     BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
                         .enabled(false)
                         .build())));
     assertThat(findClient("account").isEnabled()).isFalse();
 
-    withRealmManager(realmManager -> realmManager.reconcileBuiltInClients(List.of()));
+    withRealmManager(realmManager -> realmManager.provisionBuiltInClients(List.of()));
 
     assertThat(findClient("account").isEnabled()).isTrue();
   }
@@ -147,8 +149,8 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     try (DefaultKeycloakConnectionManager connection =
         new DefaultKeycloakConnectionManager(config)) {
       RealmManager realmManager = connection.realmManager(REALM);
-      realmManager.createOrUpdateClients(List.of(client("acme-a"), client("acme-b")));
-      realmManager.createOrUpdateClients(List.of(client("acme-a")));
+      realmManager.provisionManagedClients(List.of(client("acme-a"), client("acme-b")));
+      realmManager.provisionManagedClients(List.of(client("acme-a")));
     }
 
     // 'acme-b' fell out of scope and went; 'system-kept' was never in scope under this naming.
@@ -156,7 +158,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   /**
-   * Keycloak ignores scope assignments on the client update, so they need their own reconciliation
+   * Keycloak ignores scope assignments on the client update, so they need their own provisioning
    * step — both when a client is created and when its scopes change afterwards.
    */
   @Test
@@ -165,23 +167,23 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     client.setDefaultClientScopes(List.of("profile", "email"));
     client.setOptionalClientScopes(List.of("phone"));
 
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(client)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(client)));
 
     assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("profile", "email");
     assertThat(optionalScopeNames("system-a")).containsExactly("phone");
   }
 
   @Test
-  void reconcilesClientScopesOfAnExistingClient() {
+  void provisionsClientScopesOfAnExistingClient() {
     ClientRepresentation initial = client("system-a");
     initial.setDefaultClientScopes(List.of("profile", "email"));
     initial.setOptionalClientScopes(List.of());
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(initial)));
 
     ClientRepresentation changed = client("system-a");
     changed.setDefaultClientScopes(List.of("email", "roles"));
     changed.setOptionalClientScopes(List.of());
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(changed)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(changed)));
 
     assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("email", "roles");
   }
@@ -193,7 +195,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     client.setDefaultClientScopes(List.of());
     client.setOptionalClientScopes(List.of());
 
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(client)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(client)));
 
     assertThat(defaultScopeNames("system-a")).isEmpty();
     assertThat(optionalScopeNames("system-a")).isEmpty();
@@ -203,7 +205,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   @Test
   void leavesClientScopesAloneWhenNoneAreConfigured() {
     withRealmManager(
-        realmManager -> realmManager.createOrUpdateClients(List.of(client("system-a"))));
+        realmManager -> realmManager.provisionManagedClients(List.of(client("system-a"))));
 
     assertThat(defaultScopeNames("system-a")).contains("profile", "email");
   }
@@ -214,7 +216,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     client.setDefaultClientScopes(List.of("no-such-scope"));
     client.setOptionalClientScopes(List.of());
 
-    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(client))))
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.provisionManagedClients(List.of(client))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("no-such-scope");
   }
@@ -224,7 +226,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void createsOrUpdatesASingleClientWithoutTouchingTheOthers() {
     withRealmManager(
         realmManager ->
-            realmManager.createOrUpdateClients(List.of(client("system-a"), client("system-b"))));
+            realmManager.provisionManagedClients(List.of(client("system-a"), client("system-b"))));
 
     withRealmManager(realmManager -> realmManager.createOrUpdateUnmanagedClient(client("app-c")));
 
@@ -243,7 +245,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("app-a").getName()).isEqualTo("renamed");
   }
 
-  /** The managed namespace has its own reconciliation; mixing the two would fence nothing. */
+  /** The managed namespace has its own provisioning; mixing the two would fence nothing. */
   @Test
   void rejectsAManagedClientId() {
     assertThatThrownBy(
@@ -253,19 +255,20 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   /**
-   * A secret is only reconciled when it is declared: nulling the existing one would read as a
+   * A secret is only provisioned when it is declared: nulling the existing one would read as a
    * change and recreate the client on every single run.
    */
   @Test
   void leavesTheSecretAloneWhenTheClientDeclaresNone() {
     withRealmManager(
         realmManager ->
-            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+            realmManager.provisionManagedClients(
+                List.of(confidentialClient("system-a", "s3cr3t"))));
     String serviceAccountIdBefore = serviceAccountId("system-a");
 
     ClientRepresentation withoutSecret = confidentialClient("system-a", null);
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(withoutSecret)));
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(withoutSecret)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(withoutSecret)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(withoutSecret)));
 
     assertThat(clientSecret("system-a")).isEqualTo("s3cr3t");
     assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
@@ -276,11 +279,12 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void dropsTheSecretWhenTheClientTurnsPublic() {
     withRealmManager(
         realmManager ->
-            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+            realmManager.provisionManagedClients(
+                List.of(confidentialClient("system-a", "s3cr3t"))));
 
     ClientRepresentation asPublic = client("system-a");
     asPublic.setPublicClient(true);
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(asPublic)));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(asPublic)));
 
     assertThat(findClient("system-a").isPublicClient()).isTrue();
     assertThat(findClient("system-a").getSecret()).isNull();
@@ -291,12 +295,14 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void appliesANewSecretToAnExistingClient() {
     withRealmManager(
         realmManager ->
-            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+            realmManager.provisionManagedClients(
+                List.of(confidentialClient("system-a", "s3cr3t"))));
     String serviceAccountIdBefore = serviceAccountId("system-a");
 
     withRealmManager(
         realmManager ->
-            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "r0tat3d"))));
+            realmManager.provisionManagedClients(
+                List.of(confidentialClient("system-a", "r0tat3d"))));
 
     assertThat(clientSecret("system-a")).isEqualTo("r0tat3d");
     assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
@@ -310,7 +316,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   void rejectsAClientWhoseIdLacksTheConfiguredPrefix() {
     ClientRepresentation unmanaged = client("unmanaged-app");
 
-    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(unmanaged))))
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.provisionManagedClients(List.of(unmanaged))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("unmanaged-app")
         .hasMessageContaining("system-");
@@ -320,16 +326,16 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
   /** These flags only took effect on creation before, so drift could not be provisioned away. */
   @Test
-  void reconcilesClientFlagsOnUpdate() {
+  void provisionsClientFlagsOnUpdate() {
     ClientRepresentation initial = client("system-a");
     initial.setStandardFlowEnabled(true);
     initial.setServiceAccountsEnabled(true);
-    withRealmManager(rm -> rm.createOrUpdateClients(List.of(initial)));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(initial)));
 
     ClientRepresentation changed = client("system-a");
     changed.setStandardFlowEnabled(false);
     changed.setServiceAccountsEnabled(false);
-    withRealmManager(rm -> rm.createOrUpdateClients(List.of(changed)));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(changed)));
 
     ClientRepresentation actual = findClient("system-a");
     assertThat(actual.isStandardFlowEnabled()).isFalse();
@@ -337,16 +343,16 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   /**
-   * Safe to reconcile because a managed client can never be one of Keycloak's own: those carry no
+   * Safe to provision because a managed client can never be one of Keycloak's own: those carry no
    * prefix, and this method rejects anything without one.
    */
   @Test
   void reEnablesAManagedClientThatWasDisabledOutOfBand() {
-    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client("system-a"))));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
     disableInAdminConsole("system-a");
     assertThat(findClient("system-a").isEnabled()).isFalse();
 
-    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client("system-a"))));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
 
     assertThat(findClient("system-a").isEnabled()).isTrue();
   }
@@ -361,7 +367,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     onlyOptional.setOptionalClientScopes(List.of());
 
     assertThatThrownBy(
-            () -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(onlyOptional))))
+            () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(onlyOptional))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("system-a")
         .hasMessageContaining("optional");
@@ -369,7 +375,8 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     ClientRepresentation onlyDefault = client("system-b");
     onlyDefault.setDefaultClientScopes(List.of("profile"));
 
-    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateClients(List.of(onlyDefault))))
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(onlyDefault))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("default");
   }
@@ -381,7 +388,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     client.setDefaultClientScopes(List.of("profile", "email"));
     client.setOptionalClientScopes(List.of());
 
-    withRealmManager(rm -> rm.createOrUpdateClients(List.of(client)));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client)));
 
     assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("profile", "email");
     assertThat(optionalScopeNames("system-a")).isEmpty();

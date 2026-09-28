@@ -7,7 +7,7 @@ import org.keycloak.representations.idm.ClientRepresentation;
 
 /**
  * How one of Keycloak's own clients should be configured. These clients are never created or
- * deleted, only adjusted: a client without an entry is reconciled to enabled and otherwise left as
+ * deleted, only adjusted: a client without an entry is provisioned to enabled and otherwise left as
  * Keycloak made it.
  *
  * <p>{@link Builder#enabled(boolean)} is written on every run, so dropping an entry re-enables its

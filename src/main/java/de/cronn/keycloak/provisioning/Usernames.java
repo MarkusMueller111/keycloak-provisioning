@@ -10,8 +10,8 @@ public final class Usernames {
 
   /**
    * Keycloak stores usernames lower-cased, so a mixed-case one is never the name the realm actually
-   * holds. Reconciliation then compares the configured spelling against the stored one and takes
-   * the user for unmanaged, deleting the account it just created. Rejected rather than lower-cased
+   * holds. Provisioning then compares the configured spelling against the stored one and takes the
+   * user for unmanaged, deleting the account it just created. Rejected rather than lower-cased
    * silently, so the configuration says what the realm will contain.
    */
   public static String requireLowerCase(String username) {

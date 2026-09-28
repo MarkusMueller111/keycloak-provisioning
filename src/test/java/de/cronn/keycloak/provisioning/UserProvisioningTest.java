@@ -14,26 +14,26 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void createsTheConfiguredUsers() {
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("alice"), user("bob"))));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
 
     assertThat(usernames()).contains("alice", "bob");
   }
 
   /** The same bug class as the create-only client flags: these must reconcile on update. */
   @Test
-  void reconcilesUserFieldsOnUpdate() {
+  void provisionsUserFieldsOnUpdate() {
     UserRepresentation initial = user("alice");
     initial.setEnabled(true);
     initial.setEmailVerified(true);
     initial.setFirstName("Alice");
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(initial)));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(initial)));
 
     UserRepresentation changed = user("alice");
     changed.setEnabled(false);
     changed.setEmailVerified(false);
     changed.setFirstName("Alicia");
     changed.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(changed)));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(changed)));
 
     UserRepresentation actual = findUser("alice");
     assertThat(actual.isEnabled()).isFalse();
@@ -45,9 +45,9 @@ class UserProvisioningTest extends SharedKeycloakTest {
   /** Full desired state, so dropping a user from the list removes it. */
   @Test
   void deletesUsersThatAreNoLongerConfigured() {
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("alice"), user("bob"))));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
 
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("alice"))));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
 
     assertThat(usernames()).containsExactly("alice");
   }
@@ -55,9 +55,9 @@ class UserProvisioningTest extends SharedKeycloakTest {
   @Test
   void isIdempotent() {
     UserRepresentation alice = user("alice");
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(alice)));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(alice)));
 
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("alice"))));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
 
     assertThat(usernames()).containsOnlyOnce("alice");
   }
@@ -68,19 +68,18 @@ class UserProvisioningTest extends SharedKeycloakTest {
     UserRepresentation alice = user("alice");
     alice.setCredentials(List.of(password("Str0ng-P4ssw0rd!")));
 
-    withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(alice)));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(alice)));
 
     assertThat(credentialTypes("alice")).contains(CredentialRepresentation.PASSWORD);
   }
 
   /**
-   * Keycloak lower-cases the stored name, so reconciliation would compare the configured spelling
+   * Keycloak lower-cases the stored name, so provisioning would compare the configured spelling
    * against it, take the user for unmanaged and delete the account it had just created.
    */
   @Test
   void rejectsAMixedCaseUsername() {
-    assertThatThrownBy(
-            () -> withTestUserProvisioner(p -> p.createOrUpdateUsers(List.of(user("Alice")))))
+    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(user("Alice")))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("lower-case")
         .hasMessageContaining("Alice");

@@ -23,10 +23,10 @@ import org.slf4j.LoggerFactory;
  * because such realms are usually provisioned by production code running under a test or demo
  * profile.
  *
- * <p>{@link #createOrUpdateUsers(List)} takes the full desired state and deletes what is not in it,
- * the same semantics as the other reconciling methods. Users carry no naming prefix though, so
- * unlike the client reconciliation there is no fence limiting deletion to accounts this library
- * created: an incomplete list removes real accounts.
+ * <p>{@link #provisionUsers(List)} takes the full desired state and deletes what is not in it, the
+ * same semantics as the other provisioning methods. Users carry no naming prefix though, so unlike
+ * the client provisioning there is no fence limiting deletion to accounts this library created: an
+ * incomplete list removes real accounts.
  */
 public final class TestUserProvisioner {
 
@@ -47,7 +47,7 @@ public final class TestUserProvisioner {
    *
    * <p>Usernames have to be lower-case — see {@link Usernames#requireLowerCase(String)}.
    */
-  public void createOrUpdateUsers(List<UserRepresentation> users) {
+  public void provisionUsers(List<UserRepresentation> users) {
     users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
 
     List<UserRepresentation> existingUsers =

@@ -85,7 +85,7 @@ class RealmProvisioningTest extends SharedKeycloakTest {
         realmManager -> {
           realmManager.createOrUpdateRealm(realm -> {});
 
-          realmManager.createOrUpdateClients(List.of(systemClient("system-after-create")));
+          realmManager.provisionManagedClients(List.of(systemClient("system-after-create")));
         });
 
     assertThat(adminClient().realm(NEW_REALM).clients().findByClientId("system-after-create"))
