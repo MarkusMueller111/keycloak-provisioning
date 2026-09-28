@@ -64,7 +64,7 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
     logger.setLevel(Level.DEBUG);
 
     withRealmManager(
-        realmManager -> realmManager.createOrUpdateClients(List.of(client("system-a"))));
+        realmManager -> realmManager.provisionManagedClients(List.of(client("system-a"))));
 
     assertLog();
   }
@@ -76,7 +76,7 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
 
     withRealmManager(
         realmManager -> {
-          realmManager.createOrUpdateClients(List.of(client("system-readable")));
+          realmManager.provisionManagedClients(List.of(client("system-readable")));
 
           List<String> clientIds =
               realmManager.getRealmResource().clients().findAll().stream()
@@ -94,7 +94,7 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
         realmManager -> {
           ClientRepresentation client = client("system-with-secret");
           client.setSecret("t0p-s3cr3t");
-          realmManager.createOrUpdateClients(List.of(client));
+          realmManager.provisionManagedClients(List.of(client));
         });
 
     assertThat(messages()).noneMatch(message -> message.contains("t0p-s3cr3t"));

@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.AuthenticationExecutionInfoRepresentation;
 import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
 
-/** Behaviour of configureFlows and addOrUpdateExecutions. */
+/** Behaviour of provisionFlows and provisionExecutions. */
 class FlowProvisioningTest extends SharedKeycloakTest {
 
   private static final String FLOW = "test-flow";
@@ -18,7 +18,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   @Test
   void createsAFlowThatDoesNotExistYet() {
     withRealmManager(
-        realmManager -> realmManager.configureFlows(List.of(flow(FLOW, "a test flow"))));
+        realmManager -> realmManager.provisionFlows(List.of(flow(FLOW, "a test flow"))));
 
     assertThat(flowAliases()).contains(FLOW);
     assertThat(findFlow(FLOW).getDescription()).isEqualTo("a test flow");
@@ -28,8 +28,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void updatesAFlowThatAlreadyExists() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "first")));
-          realmManager.configureFlows(List.of(flow(FLOW, "second")));
+          realmManager.provisionFlows(List.of(flow(FLOW, "first")));
+          realmManager.provisionFlows(List.of(flow(FLOW, "second")));
         });
 
     assertThat(findFlow(FLOW).getDescription()).isEqualTo("second");
@@ -40,10 +40,10 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void deletesFlowsThatAreNoLongerConfigured() {
     withRealmManager(
         realmManager ->
-            realmManager.configureFlows(
+            realmManager.provisionFlows(
                 List.of(flow("kept", "kept"), flow("orphan", "no longer configured"))));
 
-    withRealmManager(realmManager -> realmManager.configureFlows(List.of(flow("kept", "kept"))));
+    withRealmManager(realmManager -> realmManager.provisionFlows(List.of(flow("kept", "kept"))));
 
     assertThat(flowAliases()).contains("kept").doesNotContain("orphan");
   }
@@ -51,7 +51,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   /** Keycloak's own flows are out of scope, however little is declared. */
   @Test
   void neverDeletesBuiltInFlows() {
-    withRealmManager(realmManager -> realmManager.configureFlows(List.of(flow(FLOW, "only this"))));
+    withRealmManager(realmManager -> realmManager.provisionFlows(List.of(flow(FLOW, "only this"))));
 
     assertThat(flowAliases()).contains("browser", "direct grant", "registration", FLOW);
   }
@@ -60,8 +60,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void addsConfiguredExecutionsToAFlow() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -71,12 +71,12 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void updatesTheRequirementOfAnExistingExecution() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
 
           FlowExecution required =
               new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
-          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(required)));
+          realmManager.provisionExecutions(Map.of(FLOW, List.of(required)));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -87,11 +87,11 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void doesNotKeepExecutionsThatAreNoLongerConfigured() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(
               Map.of(FLOW, List.of(execution("auth-cookie"), execution("auth-otp-form"))));
 
-          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
+          realmManager.provisionExecutions(Map.of(FLOW, List.of(execution("auth-cookie"))));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -102,10 +102,10 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void reordersExecutionsWithoutRecreatingThem() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
           FlowExecution cookie =
               new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionExecutions(
               Map.of(FLOW, List.of(cookie, execution("auth-otp-form"))));
         });
 
@@ -115,7 +115,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
         realmManager -> {
           FlowExecution cookie =
               new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionExecutions(
               Map.of(FLOW, List.of(execution("auth-otp-form"), cookie)));
         });
 
@@ -130,13 +130,13 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void placesANewExecutionAtItsDeclaredPosition() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-otp-form"))));
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(Map.of(FLOW, List.of(execution("auth-otp-form"))));
         });
 
     withRealmManager(
         realmManager ->
-            realmManager.addOrUpdateExecutions(
+            realmManager.provisionExecutions(
                 Map.of(FLOW, List.of(execution("auth-cookie"), execution("auth-otp-form")))));
 
     assertThat(executionProviderIds(FLOW)).containsExactly("auth-cookie", "auth-otp-form");
@@ -147,7 +147,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void appliesEachEntryToTheFlowItNames() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(
+          realmManager.provisionFlows(
               List.of(
                   flow(FLOW, "a test flow"),
                   flow("sub-a", "sub flow a"),
@@ -156,7 +156,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
           Map<String, List<FlowExecution>> perSubFlow = new LinkedHashMap<>();
           perSubFlow.put("sub-a", List.of(execution("auth-cookie")));
           perSubFlow.put("sub-b", List.of(execution("auth-otp-form")));
-          realmManager.addOrUpdateExecutions(perSubFlow);
+          realmManager.provisionExecutions(perSubFlow);
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -167,8 +167,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void nestsASubFlowAndKeepsItAcrossRuns() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(
               Map.of(FLOW, List.of(new FlowExecution.SubFlow("nested", "a nested flow", null))));
         });
 
@@ -176,7 +176,7 @@ class FlowProvisioningTest extends SharedKeycloakTest {
 
     withRealmManager(
         realmManager ->
-            realmManager.addOrUpdateExecutions(
+            realmManager.provisionExecutions(
                 Map.of(FLOW, List.of(new FlowExecution.SubFlow("nested", "a nested flow", null)))));
 
     assertThat(findSubFlow(FLOW, "nested").getId()).isEqualTo(idAfterFirstRun);
@@ -187,8 +187,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void keepsTwoSubFlowsOfTheSameParentApart() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(
               Map.of(
                   FLOW,
                   List.of(
@@ -209,8 +209,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   void tellsASubFlowApartFromAnAuthenticatorOfTheSameName() {
     withRealmManager(
         realmManager -> {
-          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-          realmManager.addOrUpdateExecutions(
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(
               Map.of(
                   FLOW,
                   List.of(
@@ -234,8 +234,8 @@ class FlowProvisioningTest extends SharedKeycloakTest {
             () ->
                 withRealmManager(
                     realmManager -> {
-                      realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
-                      realmManager.addOrUpdateExecutions(
+                      realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+                      realmManager.provisionExecutions(
                           Map.of(
                               FLOW,
                               List.of(

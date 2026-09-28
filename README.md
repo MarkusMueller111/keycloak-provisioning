@@ -17,7 +17,7 @@ Three things follow from that:
 - **Your realm configuration becomes code.** Client ids, role names and group names live in your
   own constants and enums instead of in a web form, so your IDE can rename them and find their
   usages, and the compiler keeps them in step with the code that authorizes against them.
-- **It converges instead of accumulating.** The reconciling methods take the full desired state and
+- **It converges instead of accumulating.** The provisioning methods take the full desired state and
   remove what you no longer declare, so a realm that drifted — a client added by hand, a flow left
   over from an experiment — is brought back in line on the next run rather than collecting residue.
 - **Secure defaults, not blank ones.** `MasterRealmProvisioner` starts from a hardened master realm
@@ -86,7 +86,7 @@ Every connection manager acquires a token in its constructor, so a misconfigured
 where you open it rather than on some later call. Failures are reported as `KeycloakException` with
 the underlying `jakarta.ws.rs` exception as cause.
 
-## Reconciling
+## Provisioning
 
 The methods below take the **full desired state**. Anything they manage that is missing from what
 you pass is reset, so repeated runs converge on your configuration — and an incomplete list is
@@ -95,21 +95,21 @@ deleted, what Keycloak created is returned to its default.
 
 | Method | What it resets |
 |---|---|
-| `createOrUpdateClients` | deletes every client whose id carries the configured prefix (`system-` by default) and is not in the list |
-| `configureFlows` | deletes every flow that is not one of Keycloak's built-ins and is not in the list — **including flows created by hand in the admin console** |
-| `addOrUpdateExecutions` | deletes every execution of the named flows that is not in the list |
-| `reconcileDefaultRoleComposites` | removes every composite of the realm's default role not in the list |
-| `configureUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
-| `reconcileBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
-| `TestUserProvisioner.createOrUpdateUsers` | deletes **every user in the realm** that is not in the list — see below |
+| `provisionManagedClients` | deletes every client whose id carries the configured prefix (`system-` by default) and is not in the list |
+| `provisionFlows` | deletes every flow that is not one of Keycloak's built-ins and is not in the list — **including flows created by hand in the admin console** |
+| `provisionExecutions` | deletes every execution of the named flows that is not in the list |
+| `provisionDefaultRoleComposites` | removes every composite of the realm's default role not in the list |
+| `provisionUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
+| `provisionBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
+| `TestUserProvisioner.provisionUsers` | deletes **every user in the realm** that is not in the list — see below |
 
 ### Authentication flows
 
-`configureFlows` declares the realm's flows and `addOrUpdateExecutions` their executions, keyed by
+`provisionFlows` declares the realm's flows and `provisionExecutions` their executions, keyed by
 the flow each belongs to:
 
 ```java
-realmManager.configureFlows(List.of(browserFlow, formsSubFlow));
+realmManager.provisionFlows(List.of(browserFlow, formsSubFlow));
 
 Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
 executions.put("my-browser-flow", List.of(
@@ -119,7 +119,7 @@ executions.put("my-forms-subflow", List.of(
     new Authenticator("auth-username-password-form", REQUIRED),
     new Authenticator("auth-otp-form", CONDITIONAL)));
 
-realmManager.addOrUpdateExecutions(executions);
+realmManager.provisionExecutions(executions);
 ```
 
 Entries are applied in iteration order, and a sub-flow only exists once the entry that declares it
@@ -131,7 +131,7 @@ runs, so reordering moves it rather than recreating it.
 
 An execution is identified by its provider id, or by its name for a sub-flow, so the same
 authenticator cannot appear twice in one flow — there would be nothing to tell the two apart on the
-next run. Keycloak permits it; `addOrUpdateExecutions` rejects it before writing anything.
+next run. Keycloak permits it; `provisionExecutions` rejects it before writing anything.
 
 `FlowExecution` is a sealed type: an `Authenticator` names a provider id, a `SubFlow` names a flow
 that has to exist in its own right. It deliberately carries only what an execution update can
@@ -158,7 +158,7 @@ UserProfileConfig.builder()
 
 ### Keycloak's own clients
 
-`MasterRealmProvisioner` reconciles the six clients Keycloak creates in every realm. By default
+`MasterRealmProvisioner` provisions the six clients Keycloak creates in every realm. By default
 `broker` is disabled and `account` keeps its standard flow off; everything else stays enabled.
 
 ```java
@@ -181,16 +181,16 @@ the opposite explicitly to undo one.
 
 ### Provisioning users
 
-User reconciliation lives in `TestUserProvisioner` rather than on `RealmManager`, because a user
+User provisioning lives in `TestUserProvisioner` rather than on `RealmManager`, because a user
 list is rarely configuration: a realm that matters gets its accounts from people signing up or from
 an identity provider, not from a list in your source code.
 
 ```java
-new TestUserProvisioner(realmManager).createOrUpdateUsers(List.of(testUser));
+new TestUserProvisioner(realmManager).provisionUsers(List.of(testUser));
 ```
 
 Use it for realms whose whole user list is fixture data — a test container, a demo environment, a
-seeded local setup. It takes the full desired state like the other reconciling methods, but note
+seeded local setup. It takes the full desired state like the other provisioning methods, but note
 that users carry no naming prefix, so there is no fence here: **an incomplete list deletes real
 accounts**. Service accounts are unaffected, as Keycloak keeps them out of the user listing.
 
@@ -209,12 +209,12 @@ client.setOptionalClientScopes(List.of());
 Naming either list opts the client out of the realm's default scopes for **both** — Keycloak's
 behaviour, not this library's. A client that declares only its optional scopes therefore ends up
 with no default scopes either, and its tokens carry neither `preferred_username` nor realm roles
-while login still succeeds, which makes the omission easy to miss. `createOrUpdateClients` rejects
+while login still succeeds, which makes the omission easy to miss. `provisionManagedClients` rejects
 a half-declared client rather than letting that happen.
 
 ### Naming
 
-The reconciling methods only ever delete objects carrying the configured prefix, which is what keeps
+The provisioning methods only ever delete objects carrying the configured prefix, which is what keeps
 them away from anything you did not provision. A realm therefore has to keep the same naming for its
 whole lifetime: changing it orphans everything provisioned under the old prefix and pulls unrelated
 objects into scope for deletion.
@@ -233,7 +233,7 @@ marker. In a Keycloak serving one application every object belongs to that appli
 `standard()` is almost always right.
 
 The provisioning client is deliberately **not** named through this: its id carries no prefix, so it
-stays outside the managed namespace and your own `createOrUpdateClients` call — which deletes every
+stays outside the managed namespace and your own `provisionManagedClients` call — which deletes every
 managed client not in the list — does not delete the identity you are connected as.
 
 A connection carries one naming and passes it to every `RealmManager` it creates, so the two cannot

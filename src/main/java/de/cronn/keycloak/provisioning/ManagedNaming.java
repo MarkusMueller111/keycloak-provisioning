@@ -7,7 +7,7 @@ import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 
 /**
- * How this library names the objects it manages. The prefix is a deletion fence: the reconciling
+ * How this library names the objects it manages. The prefix is a deletion fence: the provisioning
  * methods remove every object they recognize as managed that is no longer configured, so a realm
  * has to be provisioned with the same naming for its whole lifetime.
  *
@@ -59,8 +59,8 @@ public final class ManagedNaming {
   }
 
   /**
-   * Whether the client is one this library provisions, i.e. whether the reconciliation may delete
-   * it. Takes the representation rather than a string because a client is fenced by its {@code
+   * Whether the client is one this library provisions, i.e. whether the provisioning may delete it.
+   * Takes the representation rather than a string because a client is fenced by its {@code
    * clientId}, while {@code getName()} is a display name that must not be used here.
    */
   public boolean isManaged(ClientRepresentation client) {

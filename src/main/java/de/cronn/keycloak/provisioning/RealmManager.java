@@ -109,12 +109,12 @@ public class RealmManager {
   }
 
   /**
-   * Reconciles the realm roles composed into the realm's default role (i.e. granted to every user)
+   * Provisions the realm roles composed into the realm's default role (i.e. granted to every user)
    * to exactly match {@code roleNames}: adds missing ones, removes any composite realm role not
    * listed. {@code roleNames} is treated as the full desired set, the same "declare it all"
    * semantics as {@link MasterRealmConfig#builtInClients()}. Safe to call repeatedly.
    */
-  public void reconcileDefaultRoleComposites(Collection<String> roleNames) {
+  public void provisionDefaultRoleComposites(Collection<String> roleNames) {
     RealmResource realm = getRealmResource();
     RoleRepresentation defaultRole = realm.toRepresentation().getDefaultRole();
     RoleResource defaultRoleResource = realm.roles().get(defaultRole.getName());
@@ -146,15 +146,15 @@ public class RealmManager {
   }
 
   /**
-   * Reconciles Keycloak's own clients: what {@code builtInClients} declares is applied, every other
+   * Provisions Keycloak's own clients: what {@code builtInClients} declares is applied, every other
    * built-in is reset to enabled. Removing an entry therefore undoes it. Clients this library or a
-   * consumer provisioned are out of scope, those belong to {@link #createOrUpdateClients(List)}.
+   * consumer provisioned are out of scope, those belong to {@link #provisionManagedClients(List)}.
    */
-  public void reconcileBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
+  public void provisionBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
     Map<KeycloakProvidedClient, BuiltInClientConfig> byClient = new LinkedHashMap<>();
     for (BuiltInClientConfig config : builtInClients) {
       // Before the first write: two entries for one client contradict each other, and reporting
-      // that half-way through leaves the realm partly reconciled.
+      // that half-way through leaves the realm partly provisioned.
       Validate.isTrue(
           byClient.put(config.client(), config) == null,
           "Client '%s' is configured more than once",
@@ -235,27 +235,27 @@ public class RealmManager {
         .collect(StreamUtil.toSingleOptionalElement());
   }
 
-  public void createOrUpdateClients(List<ClientRepresentation> clients) {
+  public void provisionManagedClients(List<ClientRepresentation> clients) {
     clients.forEach(this::assertClientIsManaged);
     clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
-    createOrUpdateClients(clients, existingClientsPredicate);
+    provisionManagedClients(clients, existingClientsPredicate);
   }
 
   /**
-   * Reconciles one client outside the managed namespace, scoped to its own id so nothing else can
+   * Provisions one client outside the managed namespace, scoped to its own id so nothing else can
    * be deleted. For clients this library creates but does not own the lifecycle of. E.g. the
-   * provisioning client itself, which must stay clear of {@link #createOrUpdateClients} so a
-   * consumer's own reconciliation does not delete the identity it is connected as.
+   * provisioning client itself, which must stay clear of {@link #provisionManagedClients} so a
+   * consumer's own provisioning does not delete the identity it is connected as.
    */
   public void createOrUpdateUnmanagedClient(ClientRepresentation client) {
     String clientId = client.getClientId();
     Validate.isTrue(
         !clientNaming.isManaged(client),
-        "Client '%s' carries the managed prefix '%s' and belongs in createOrUpdateClients",
+        "Client '%s' carries the managed prefix '%s' and belongs in provisionManagedClients",
         clientId,
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
-    createOrUpdateClients(List.of(client), existing -> clientId.equals(existing.getClientId()));
+    provisionManagedClients(List.of(client), existing -> clientId.equals(existing.getClientId()));
   }
 
   /**
@@ -279,8 +279,8 @@ public class RealmManager {
    * Keycloak treats scope assignment on a new client as all-or-nothing: specifying either list
    * makes it skip the realm's default scopes for <em>both</em>, so a client that only sets the
    * optional list silently ends up with no default scopes either. Declaring one without the other
-   * is therefore always a mistake, and reconciliation cannot repair it — a null list means "leave
-   * as is", which is indistinguishable from "was never assigned".
+   * is therefore always a mistake, and provisioning cannot repair it — a null list means "leave as
+   * is", which is indistinguishable from "was never assigned".
    */
   private static void assertClientScopesAreCompletelySpecified(ClientRepresentation client) {
     boolean defaultScopesGiven = client.getDefaultClientScopes() != null;
@@ -297,7 +297,7 @@ public class RealmManager {
             + " (an empty list assigns none) or neither (Keycloak's defaults apply).");
   }
 
-  void createOrUpdateClients(
+  void provisionManagedClients(
       List<ClientRepresentation> clients,
       Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
     List<ClientRepresentation> existingClients =
@@ -310,7 +310,7 @@ public class RealmManager {
     clientDiffer.getElementsToDelete().forEach(this::deleteClient);
     clientDiffer.getElementsToUpdate().forEach(this::updateClient);
 
-    reconcileClientScopeAssignments(clients);
+    provisionClientScopeAssignments(clients);
   }
 
   /**
@@ -318,7 +318,7 @@ public class RealmManager {
    * updated, so they are assigned through their own endpoints once the clients themselves are in
    * place. A {@code null} list means "leave as is"; an empty one removes every assignment.
    */
-  private void reconcileClientScopeAssignments(List<ClientRepresentation> clients) {
+  private void provisionClientScopeAssignments(List<ClientRepresentation> clients) {
     boolean anyScopesConfigured =
         clients.stream()
             .anyMatch(
@@ -338,15 +338,15 @@ public class RealmManager {
     for (ClientRepresentation client : clients) {
       getClientByClientId(client.getClientId())
           .ifPresent(
-              clientResource -> reconcileClientScopes(clientResource, client, scopeIdsByName));
+              clientResource -> provisionClientScopes(clientResource, client, scopeIdsByName));
     }
   }
 
-  private void reconcileClientScopes(
+  private void provisionClientScopes(
       ClientResource clientResource,
       ClientRepresentation desiredClient,
       Map<String, String> scopeIdsByName) {
-    reconcileClientScopes(
+    provisionClientScopes(
         desiredClient.getClientId(),
         desiredClient.getDefaultClientScopes(),
         scopeNames(clientResource.getDefaultClientScopes()),
@@ -354,7 +354,7 @@ public class RealmManager {
         "default",
         clientResource::addDefaultClientScope,
         clientResource::removeDefaultClientScope);
-    reconcileClientScopes(
+    provisionClientScopes(
         desiredClient.getClientId(),
         desiredClient.getOptionalClientScopes(),
         scopeNames(clientResource.getOptionalClientScopes()),
@@ -364,7 +364,7 @@ public class RealmManager {
         clientResource::removeOptionalClientScope);
   }
 
-  private void reconcileClientScopes(
+  private void provisionClientScopes(
       String clientId,
       List<String> desiredScopeNames,
       List<String> assignedScopeNames,
@@ -525,13 +525,13 @@ public class RealmManager {
   }
 
   /**
-   * Reconciles the realm's authentication flows to exactly match {@code flows}: adds missing ones,
+   * Provisions the realm's authentication flows to exactly match {@code flows}: adds missing ones,
    * updates existing ones, and deletes any flow no longer listed. {@code flows} is treated as the
    * full desired set, the same "declare it all" semantics as {@link
    * MasterRealmConfig#builtInClients()}. Keycloak's own flows are never touched, so only flows
    * created outside this call are at risk of deletion. Safe to call repeatedly.
    */
-  public void configureFlows(List<AuthenticationFlowRepresentation> flows) {
+  public void provisionFlows(List<AuthenticationFlowRepresentation> flows) {
     List<AuthenticationFlowRepresentation> existingFlows =
         getRealmResource().flows().getFlows().stream()
             .filter(flow -> flow.isBuiltIn() != Boolean.TRUE)
@@ -543,10 +543,10 @@ public class RealmManager {
         .filter(flow -> !configuredAliases.contains(flow.getAlias()))
         .forEach(this::deleteFlow);
 
-    flows.forEach(flow -> configureFlow(flow, existingFlows));
+    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows));
   }
 
-  private void configureFlow(
+  private void createOrUpdateFlow(
       AuthenticationFlowRepresentation flow, List<AuthenticationFlowRepresentation> existingFlows) {
     Optional<AuthenticationFlowRepresentation> existingFlow =
         existingFlows.stream().filter(f -> Objects.equals(f.getAlias(), flow.getAlias())).findAny();
@@ -558,9 +558,7 @@ public class RealmManager {
       }
     } else {
       log.info(
-          "Configuring authentication flow '{}' on Keycloak realm '{}'",
-          flow.getAlias(),
-          realmName);
+          "Updating authentication flow '{}' on Keycloak realm '{}'", flow.getAlias(), realmName);
       getRealmResource().flows().updateFlow(existingFlow.get().getId(), flow);
     }
   }
@@ -580,7 +578,7 @@ public class RealmManager {
    * it has run, so pass an ordered map: with {@link Map#of} the order is unspecified and an entry
    * naming a sub-flow can run first and fail with a 404.
    */
-  public void addOrUpdateExecutions(Map<String, List<FlowExecution>> configuredExecutions) {
+  public void provisionExecutions(Map<String, List<FlowExecution>> configuredExecutions) {
     configuredExecutions.forEach(
         (flowName, flowExecutions) -> {
           List<AuthenticationExecutionInfoRepresentation> executions =
@@ -612,7 +610,7 @@ public class RealmManager {
       String id = AuthenticationExecutionRepresentationDiffer.id(execution);
       Validate.isTrue(
           seen.add(id),
-          "Flow '%s' declares '%s' more than once, which cannot be reconciled",
+          "Flow '%s' declares '%s' more than once, which cannot be provisioned",
           flowName,
           id);
     }
@@ -727,7 +725,7 @@ public class RealmManager {
     getRealmResource().flows().updateExecutions(parentFlow, executionUpdate);
   }
 
-  public void configureUserProfile(UserProfileConfig userProfileConfig) {
+  public void provisionUserProfile(UserProfileConfig userProfileConfig) {
     UserProfileResource userProfileResource = getRealmResource().users().userProfile();
     UPConfig upConfig = userProfileResource.getConfiguration();
 

@@ -325,7 +325,7 @@ public final class MasterRealmConfig {
     /**
      * Configuration for Keycloak's own clients, merged over {@link
      * BuiltInClientConfig#BUILT_IN_CLIENT_DEFAULTS} per client: a declared client overrides its
-     * default, every other keeps it. A built-in mentioned by neither is reconciled to enabled.
+     * default, every other keeps it. A built-in mentioned by neither is provisioned to enabled.
      */
     public Builder builtInClients(List<BuiltInClientConfig> builtInClients) {
       this.builtInClients = builtInClients;

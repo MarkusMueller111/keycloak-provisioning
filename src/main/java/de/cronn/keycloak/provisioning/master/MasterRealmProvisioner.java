@@ -51,10 +51,10 @@ public class MasterRealmProvisioner {
   /** Runs all provisioning steps against the master realm, using the given config. */
   public void provision() {
     configureRealm();
-    reconcileBuiltInClients();
+    provisionBuiltInClients();
     configureRequiredActions();
-    configureDefaultRealmRoleComposites();
-    configureUserProfile();
+    provisionDefaultRealmRoleComposites();
+    provisionUserProfile();
     createPermanentAdminIfAbsent();
     deleteTemporaryAdminUsers();
   }
@@ -96,8 +96,8 @@ public class MasterRealmProvisioner {
     realmManager.refreshToken();
   }
 
-  private void reconcileBuiltInClients() {
-    realmManager.reconcileBuiltInClients(config.builtInClients());
+  private void provisionBuiltInClients() {
+    realmManager.provisionBuiltInClients(config.builtInClients());
   }
 
   /** Also covers admins created via {@code kc.sh bootstrap-admin}, which carry the same marker. */
@@ -159,13 +159,13 @@ public class MasterRealmProvisioner {
     }
   }
 
-  private void configureUserProfile() {
+  private void provisionUserProfile() {
     UserProfileConfig userProfileConfig = config.userProfile();
-    realmManager.configureUserProfile(userProfileConfig);
+    realmManager.provisionUserProfile(userProfileConfig);
   }
 
-  private void configureDefaultRealmRoleComposites() {
-    realmManager.reconcileDefaultRoleComposites(config.defaultRoleComposites());
+  private void provisionDefaultRealmRoleComposites() {
+    realmManager.provisionDefaultRoleComposites(config.defaultRoleComposites());
   }
 
   private void configureRequiredActions() {
