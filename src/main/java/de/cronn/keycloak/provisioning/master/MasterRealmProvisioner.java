@@ -3,6 +3,7 @@ package de.cronn.keycloak.provisioning.master;
 import static de.cronn.keycloak.provisioning.KeycloakProvidedClient.ADMIN_CLI;
 
 import de.cronn.keycloak.provisioning.BuiltInClientConfig;
+import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.SecurityHeader;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
@@ -11,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.RealmResource;
@@ -126,7 +128,9 @@ public class MasterRealmProvisioner {
     // Built once: username and realm roles have to describe the very user we create.
     UserRepresentation user = permanentAdmin.buildUser();
     String username = user.getUsername();
-    if (realmManager.getUserByUsername(username).isPresent()) {
+    Optional<UserRepresentation> existing = realmManager.getUserByUsername(username);
+    if (existing.isPresent()) {
+      assertIsNotATemporaryAdmin(existing.get());
       log.info("Permanent admin '{}' already exists, leaving it untouched", username);
       return;
     }
@@ -142,6 +146,24 @@ public class MasterRealmProvisioner {
       // which would then delete the temporary admins and leave the realm unreachable.
       realmManager.deleteUser(userId);
       throw e;
+    }
+  }
+
+  /**
+   * Naming the permanent admin after a temporary one would leave the realm unreachable: it is taken
+   * for already provisioned, so it keeps the bootstrap password and never gets the required
+   * actions, and {@link #deleteTemporaryAdminUsers()} then removes it as the last step.
+   */
+  private void assertIsNotATemporaryAdmin(UserRepresentation existing) {
+    boolean isTemporaryAdmin =
+        realmManager.getUsersMarkedAsTemporaryAdmin().stream()
+            .anyMatch(temporaryAdmin -> temporaryAdmin.getId().equals(existing.getId()));
+    if (isTemporaryAdmin) {
+      throw new KeycloakException(
+          "Permanent admin '"
+              + existing.getUsername()
+              + "' is one of Keycloak's temporary admins. Give it a username of its own, otherwise"
+              + " provisioning would delete the very user it is supposed to keep.");
     }
   }
 

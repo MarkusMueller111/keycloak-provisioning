@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
@@ -78,6 +79,27 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
 
     assertThat(masterUser(username).getId()).isEqualTo(created.getId());
     assertThat(masterUser(username).getEmail()).isEqualTo(created.getEmail());
+  }
+
+  /**
+   * Without this the realm ends up unreachable: the temporary admin is taken for an already
+   * provisioned permanent one, so it keeps the bootstrap password, and deleting the temporary
+   * admins then removes the only account left.
+   */
+  @Test
+  void rejectsAPermanentAdminNamedLikeATemporaryOne() {
+    assertThatThrownBy(
+            () ->
+                provision(
+                    configBuilder(
+                            new PermanentAdmin.Standard(
+                                ADMIN_USERNAME, "Str0ng-P4ssw0rd!", "admin@example.com"))
+                        .build()))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining(ADMIN_USERNAME)
+        .hasMessageContaining("temporary");
+
+    assertThat(masterUser(ADMIN_USERNAME)).isNotNull();
   }
 
   @Test
