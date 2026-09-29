@@ -608,6 +608,7 @@ public class RealmManager {
     AuthenticationExecutionInfoRepresentation addedExecution =
         getAddedExecution(execution, parentFlow);
     addedExecution.setRequirement(execution.getRequirement());
+    addedExecution.setPriority(execution.getPriority());
     getRealmResource().flows().updateExecutions(parentFlow, addedExecution);
   }
 

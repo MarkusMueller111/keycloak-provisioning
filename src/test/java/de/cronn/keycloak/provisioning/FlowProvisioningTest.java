@@ -125,6 +125,23 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(findExecution(FLOW, "auth-cookie").getRequirement()).isEqualTo("REQUIRED");
   }
 
+  /** Keycloak appends a new execution, so its declared position only holds if we write it back. */
+  @Test
+  void placesANewExecutionAtItsDeclaredPosition() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.configureFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.addOrUpdateExecutions(Map.of(FLOW, List.of(execution("auth-otp-form"))));
+        });
+
+    withRealmManager(
+        realmManager ->
+            realmManager.addOrUpdateExecutions(
+                Map.of(FLOW, List.of(execution("auth-cookie"), execution("auth-otp-form")))));
+
+    assertThat(executionProviderIds(FLOW)).containsExactly("auth-cookie", "auth-otp-form");
+  }
+
   /** Each entry is applied to the flow it names, independently of the others. */
   @Test
   void appliesEachEntryToTheFlowItNames() {
