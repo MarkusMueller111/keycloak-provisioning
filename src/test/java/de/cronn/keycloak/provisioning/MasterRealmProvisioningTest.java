@@ -10,7 +10,9 @@ import de.cronn.keycloak.provisioning.master.PermanentAdmin;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
 /**
@@ -102,6 +104,26 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(masterUser(ADMIN_USERNAME)).isNotNull();
   }
 
+  /** The full desired set, so Keycloak's own composites go unless they are declared again. */
+  @Test
+  void replacesTheDefaultRoleCompositesThatAreNotDeclared() {
+    provision(
+        configBuilder(PermanentAdmin.none())
+            .defaultRoleComposites(List.of("offline_access"))
+            .build());
+
+    assertThat(defaultRoleCompositeNames())
+        .contains("offline_access")
+        .doesNotContain("uma_authorization");
+  }
+
+  @Test
+  void keepsKeycloaksOwnDefaultRoleComposites() {
+    provision(configBuilder(PermanentAdmin.none()).build());
+
+    assertThat(defaultRoleCompositeNames()).contains("offline_access", "uma_authorization");
+  }
+
   @Test
   void permanentAdminNoneCreatesNoUser() {
     long usersBefore = masterUserCount();
@@ -156,6 +178,14 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
 
   private long masterUserCount() {
     return adminClient().realm("master").users().count();
+  }
+
+  private List<String> defaultRoleCompositeNames() {
+    RealmResource master = adminClient().realm("master");
+    String defaultRoleName = master.toRepresentation().getDefaultRole().getName();
+    return master.roles().get(defaultRoleName).getRealmRoleComposites().stream()
+        .map(RoleRepresentation::getName)
+        .toList();
   }
 
   private List<String> realmRoleNames(UserRepresentation user) {

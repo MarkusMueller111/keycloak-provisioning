@@ -482,6 +482,10 @@ public class RealmManager {
    * Each entry of {@code configuredExecutions} is the full desired content of that flow, so an
    * execution missing from it is removed. {@code parentFlow} is only the flow the sub-flows belong
    * to; pass it as a key as well to configure its own executions.
+   *
+   * <p>Entries are applied in iteration order, and a sub-flow only exists once the entry declaring
+   * it has run, so pass an ordered map: with {@link Map#of} the order is unspecified and an entry
+   * naming a sub-flow can run first and fail with a 404.
    */
   public void addOrUpdateExecutions(Map<String, List<FlowExecution>> configuredExecutions) {
     configuredExecutions.forEach(

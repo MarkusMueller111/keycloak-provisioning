@@ -109,14 +109,21 @@ the flow each belongs to:
 
 ```java
 realmManager.configureFlows(List.of(browserFlow, formsSubFlow));
-realmManager.addOrUpdateExecutions(Map.of(
-    "my-browser-flow", List.of(
-        new Authenticator("auth-cookie", ALTERNATIVE),
-        new SubFlow("my-forms-subflow", "username, password and OTP", ALTERNATIVE)),
-    "my-forms-subflow", List.of(
-        new Authenticator("auth-username-password-form", REQUIRED),
-        new Authenticator("auth-otp-form", CONDITIONAL))));
+
+Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
+executions.put("my-browser-flow", List.of(
+    new Authenticator("auth-cookie", ALTERNATIVE),
+    new SubFlow("my-forms-subflow", "username, password and OTP", ALTERNATIVE)));
+executions.put("my-forms-subflow", List.of(
+    new Authenticator("auth-username-password-form", REQUIRED),
+    new Authenticator("auth-otp-form", CONDITIONAL)));
+
+realmManager.addOrUpdateExecutions(executions);
 ```
+
+Entries are applied in iteration order, and a sub-flow only exists once the entry that declares it
+has run — so use an ordered map and name a flow before the entry that fills it. `Map.of` iterates in
+an unspecified order and will fail with a 404 on some runs and not others.
 
 The order you declare executions in is the order they run in. An execution keeps its identity across
 runs, so reordering moves it rather than recreating it.

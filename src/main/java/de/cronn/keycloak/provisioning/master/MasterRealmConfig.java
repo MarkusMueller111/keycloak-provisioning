@@ -372,8 +372,10 @@ public final class MasterRealmConfig {
     }
 
     /**
-     * Realm role names to compose into the realm's default role, i.e. granted to every user.
-     * Default: empty (opt-in; composing broad roles into the default role is security-sensitive).
+     * Realm role names to compose into the realm's default role, i.e. granted to every user. The
+     * full desired set: Keycloak's own {@code offline_access} and {@code uma_authorization} are the
+     * default, and passing a list without them removes them from every user. Use {@link
+     * #addDefaultRoleComposites(Collection)} to keep them.
      */
     public Builder defaultRoleComposites(Collection<String> defaultRoleComposites) {
       this.defaultRoleComposites = new LinkedHashSet<>(defaultRoleComposites);
