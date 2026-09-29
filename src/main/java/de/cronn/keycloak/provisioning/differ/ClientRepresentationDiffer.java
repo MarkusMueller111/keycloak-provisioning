@@ -5,22 +5,6 @@ import org.keycloak.representations.idm.ClientRepresentation;
 
 public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentation> {
 
-  /** As {@link Differ} renders a changed secret, whose value it masks rather than printing. */
-  private static final String MASKED_SECRET_LINE = "\"secret\" : \"[masked]\"";
-
-  /**
-   * Keycloak ignores a new secret on the client update, so it has to be recreated instead. Matching
-   * the whole rendered line rather than the word: a diff mentions {@code secret} for unrelated
-   * reasons too, such as Keycloak's own {@code client.secret.creation.time} attribute disappearing,
-   * and a client should not be torn down over that.
-   */
-  public static boolean isSecretChanged(String multiLineDiff) {
-    return multiLineDiff
-        .lines()
-        .map(line -> line.replaceFirst("^[-+] ", "").trim())
-        .anyMatch(MASKED_SECRET_LINE::equals);
-  }
-
   private static PropertyUpdater<ClientRepresentation> clientRepresentationUpdater() {
     return (target, source) -> {
       target.setClientId(source.getClientId());
@@ -35,8 +19,7 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setRedirectUris(source.getRedirectUris());
       target.setWebOrigins(source.getWebOrigins());
       if (source.getSecret() != null) {
-        // A null secret means "not declared", not "remove it": nulling the existing one reads as a
-        // change and would recreate the client on every run.
+        // A null secret means "not declared", not "remove it".
         target.setSecret(source.getSecret());
       }
       target.setAttributes(source.getAttributes());

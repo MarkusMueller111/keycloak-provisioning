@@ -229,26 +229,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   /**
-   * Keycloak will not take a new secret on the client update, so that one case recreates the
-   * client. Everything else has to be updated in place — recreating costs the client its service
-   * account and any roles mapped to it. The id does not prove that: it is carried over from the
-   * server's representation and posted back, so it survives a recreate too.
-   */
-  @Test
-  void updatesInPlaceWhenTheSecretIsUnchanged() {
-    ClientRepresentation initial = confidentialClient("system-a", "s3cr3t");
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
-    String serviceAccountIdBefore = serviceAccountId("system-a");
-
-    ClientRepresentation renamed = confidentialClient("system-a", "s3cr3t");
-    renamed.setName("renamed");
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(renamed)));
-
-    assertThat(findClient("system-a").getName()).isEqualTo("renamed");
-    assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
-  }
-
-  /**
    * A secret is only reconciled when it is declared: nulling the existing one would read as a
    * change and recreate the client on every single run.
    */
@@ -282,18 +262,20 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("system-a").getSecret()).isNull();
   }
 
-  /** Keycloak keeps the id on the recreate, so the new secret is what proves it happened. */
+  /** Rotating a secret is an ordinary update, so the client keeps its service account. */
   @Test
   void appliesANewSecretToAnExistingClient() {
-    ClientRepresentation initial = client("system-a");
-    initial.setSecret("s3cr3t");
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
+    withRealmManager(
+        realmManager ->
+            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+    String serviceAccountIdBefore = serviceAccountId("system-a");
 
-    ClientRepresentation rotated = client("system-a");
-    rotated.setSecret("r0tat3d");
-    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(rotated)));
+    withRealmManager(
+        realmManager ->
+            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "r0tat3d"))));
 
     assertThat(clientSecret("system-a")).isEqualTo("r0tat3d");
+    assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
   }
 
   private static ClientRepresentation client(String clientId) {
