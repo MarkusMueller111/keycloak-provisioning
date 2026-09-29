@@ -34,7 +34,11 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setFrontchannelLogout(source.isFrontchannelLogout());
       target.setRedirectUris(source.getRedirectUris());
       target.setWebOrigins(source.getWebOrigins());
-      target.setSecret(source.getSecret());
+      if (source.getSecret() != null) {
+        // A null secret means "not declared", not "remove it": nulling the existing one reads as a
+        // change and would recreate the client on every run.
+        target.setSecret(source.getSecret());
+      }
       target.setAttributes(source.getAttributes());
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
       // so RealmManager reconciles them through the dedicated endpoints afterwards.

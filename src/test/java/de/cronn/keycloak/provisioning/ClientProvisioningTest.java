@@ -230,23 +230,56 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
   /**
    * Keycloak will not take a new secret on the client update, so that one case recreates the
-   * client. Everything else has to be updated in place — recreating costs the client its id, and
-   * with it the service account and any roles mapped to it.
+   * client. Everything else has to be updated in place — recreating costs the client its service
+   * account and any roles mapped to it. The id does not prove that: it is carried over from the
+   * server's representation and posted back, so it survives a recreate too.
    */
   @Test
-  void keepsTheClientWhenSomethingOtherThanTheSecretChanges() {
-    ClientRepresentation initial = client("system-a");
-    initial.setSecret("s3cr3t");
+  void updatesInPlaceWhenTheSecretIsUnchanged() {
+    ClientRepresentation initial = confidentialClient("system-a", "s3cr3t");
     withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(initial)));
-    String idBefore = findClient("system-a").getId();
+    String serviceAccountIdBefore = serviceAccountId("system-a");
 
-    ClientRepresentation renamed = client("system-a");
-    renamed.setSecret("s3cr3t");
+    ClientRepresentation renamed = confidentialClient("system-a", "s3cr3t");
     renamed.setName("renamed");
     withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(renamed)));
 
-    assertThat(findClient("system-a").getId()).isEqualTo(idBefore);
     assertThat(findClient("system-a").getName()).isEqualTo("renamed");
+    assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
+  }
+
+  /**
+   * A secret is only reconciled when it is declared: nulling the existing one would read as a
+   * change and recreate the client on every single run.
+   */
+  @Test
+  void leavesTheSecretAloneWhenTheClientDeclaresNone() {
+    withRealmManager(
+        realmManager ->
+            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+    String serviceAccountIdBefore = serviceAccountId("system-a");
+
+    ClientRepresentation withoutSecret = confidentialClient("system-a", null);
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(withoutSecret)));
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(withoutSecret)));
+
+    assertThat(clientSecret("system-a")).isEqualTo("s3cr3t");
+    assertThat(serviceAccountId("system-a")).isEqualTo(serviceAccountIdBefore);
+  }
+
+  /** Keycloak drops the secret of a client that turns public, whatever the update carries. */
+  @Test
+  void dropsTheSecretWhenTheClientTurnsPublic() {
+    withRealmManager(
+        realmManager ->
+            realmManager.createOrUpdateClients(List.of(confidentialClient("system-a", "s3cr3t"))));
+
+    ClientRepresentation asPublic = client("system-a");
+    asPublic.setPublicClient(true);
+    withRealmManager(realmManager -> realmManager.createOrUpdateClients(List.of(asPublic)));
+
+    assertThat(findClient("system-a").isPublicClient()).isTrue();
+    assertThat(findClient("system-a").getSecret()).isNull();
   }
 
   /** Keycloak keeps the id on the recreate, so the new secret is what proves it happened. */
@@ -268,6 +301,24 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     client.setClientId(clientId);
     client.setEnabled(true);
     return client;
+  }
+
+  private static ClientRepresentation confidentialClient(String clientId, String secret) {
+    ClientRepresentation client = client(clientId);
+    client.setPublicClient(false);
+    client.setServiceAccountsEnabled(true);
+    client.setSecret(secret);
+    return client;
+  }
+
+  /** Recreating a client takes its service account with it, so a stable id proves it survived. */
+  private String serviceAccountId(String clientId) {
+    return adminClient()
+        .realm(REALM)
+        .clients()
+        .get(findClient(clientId).getId())
+        .getServiceAccountUser()
+        .getId();
   }
 
   private List<String> clientIds() {
