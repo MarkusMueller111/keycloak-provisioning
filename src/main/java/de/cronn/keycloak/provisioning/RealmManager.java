@@ -5,6 +5,7 @@ import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
+import de.cronn.keycloak.provisioning.differ.ClientScopeRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.Differ;
 import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
@@ -29,6 +30,7 @@ import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.ClientResource;
+import org.keycloak.admin.client.resource.ClientScopesResource;
 import org.keycloak.admin.client.resource.ClientsResource;
 import org.keycloak.admin.client.resource.GroupResource;
 import org.keycloak.admin.client.resource.GroupsResource;
@@ -357,6 +359,74 @@ public class RealmManager {
 
     provisionClientScopeAssignments(clients);
     provisionClientProtocolMappers(clients);
+  }
+
+  /**
+   * Provisions the client scopes carrying the configured prefix. Keycloak's own scopes carry none
+   * and are never touched, which matters because deleting {@code profile} or {@code roles} strips
+   * claims from every token in the realm while login keeps working.
+   *
+   * <p>A scope's own update drops its protocol mappers, so those are provisioned separately. A
+   * {@code null} mapper list on a scope leaves its mappers alone.
+   */
+  public void provisionManagedClientScopes(List<ClientScopeRepresentation> clientScopes) {
+    clientScopes.forEach(this::assertClientScopeIsManaged);
+
+    ClientScopesResource scopesResource = getRealmResource().clientScopes();
+    List<ClientScopeRepresentation> existingScopes =
+        scopesResource.findAll().stream().filter(clientNaming::isManaged).toList();
+
+    ClientScopeRepresentationDiffer differ =
+        new ClientScopeRepresentationDiffer(existingScopes, clientScopes);
+
+    for (ClientScopeRepresentation scope : differ.getElementsToDelete()) {
+      log.info("Removing client scope '{}' from Keycloak realm '{}'", scope.getName(), realmName);
+      scopesResource.get(scope.getId()).remove();
+    }
+    for (ClientScopeRepresentation scope : differ.getElementsToAdd()) {
+      log.info("Adding client scope '{}' to Keycloak realm '{}'", scope.getName(), realmName);
+      try (Response response = scopesResource.create(scope)) {
+        assertResponseIs201Created(response);
+      }
+    }
+    for (ToUpdate<ClientScopeRepresentation> update : differ.getElementsToUpdate()) {
+      ClientScopeRepresentation scope = update.newState();
+      log.info(
+          "Client scope '{}' requires an update:\n{}", scope.getName(), update.multiLineDiff());
+      scopesResource.get(scope.getId()).update(scope);
+    }
+
+    provisionClientScopeProtocolMappers(clientScopes);
+  }
+
+  private void assertClientScopeIsManaged(ClientScopeRepresentation clientScope) {
+    if (!clientNaming.isManaged(clientScope)) {
+      throw new KeycloakException(
+          "Client scope '"
+              + clientScope.getName()
+              + "' cannot be provisioned: its name must carry the configured prefix '"
+              + clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT_SCOPE)
+              + "'.");
+    }
+  }
+
+  private void provisionClientScopeProtocolMappers(List<ClientScopeRepresentation> clientScopes) {
+    Map<String, String> scopeIdsByName =
+        getRealmResource().clientScopes().findAll().stream()
+            .collect(
+                Collectors.toMap(
+                    ClientScopeRepresentation::getName, ClientScopeRepresentation::getId));
+
+    for (ClientScopeRepresentation scope : clientScopes) {
+      if (scope.getProtocolMappers() == null) {
+        continue;
+      }
+      String id = scopeIdsByName.get(scope.getName());
+      provisionProtocolMappers(
+          getRealmResource().clientScopes().get(id).getProtocolMappers(),
+          scope.getProtocolMappers(),
+          scope.getName());
+    }
   }
 
   /**

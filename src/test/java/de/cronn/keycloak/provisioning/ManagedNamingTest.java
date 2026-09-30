@@ -70,7 +70,7 @@ class ManagedNamingTest {
 
   @Test
   void appliesCustomPrefixesPerKind() {
-    ManagedNaming custom = ManagedNaming.custom("c-", "g-", "r-");
+    ManagedNaming custom = ManagedNaming.custom("c-", "g-", "r-", "s-");
 
     assertThat(custom.clientId("web").value()).isEqualTo("c-web");
     assertThat(custom.groupName("Editors").value()).isEqualTo("g-Editors");

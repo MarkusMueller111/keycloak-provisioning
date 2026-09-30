@@ -101,6 +101,7 @@ deleted, what Keycloak created is returned to its default.
 | `provisionDefaultRoleComposites` | removes every composite of the realm's default role not in the list |
 | `provisionUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in |
 | `provisionBuiltInClients` | re-enables every client Keycloak provides that is not declared disabled |
+| `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list |
 | `TestUserProvisioner.provisionUsers` | deletes **every user in the realm** that is not in the list — see below |
 
 ### Authentication flows
@@ -237,13 +238,16 @@ The prefix fences clients only. `provisionFlows` is bounded by Keycloak's own bu
 every flow it did not create is in scope — **including ones made by hand in the admin console** —
 and `provisionUsers` has no fence at all.
 
+Client scopes are fenced by the prefix as well. The name reaches the wire — a client sends
+`scope=system-orders` — which is the price of Keycloak's own scopes never being at risk.
+
 ```java
-ManagedNaming.standard()                            // "system-", "[System] ", "system-"
-ManagedNaming.custom("acme-", "[Acme] ", "acme-")   // clients, groups, roles
+ManagedNaming.standard()   // "system-", "[System] ", "system-", "system-"
+ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-")   // clients, groups, roles, scopes
 ```
 
 Groups get a different standard prefix because their names are shown to people in the admin
-console, where `system-` reads badly. For the same reason `custom(...)` takes all three prefixes
+console, where `system-` reads badly. For the same reason `custom(...)` takes all four prefixes
 rather than applying one everywhere.
 
 The prefix means "provisioned by this library" and nothing else — it is not a tenant or project
@@ -258,7 +262,7 @@ A connection carries one naming and passes it to every `RealmManager` it creates
 disagree:
 
 ```java
-ManagedNaming naming = ManagedNaming.custom("acme-", "[Acme] ", "acme-");
+ManagedNaming naming = ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-");
 
 new KeycloakDefaultConnectionConfig(
     serverUrl,
