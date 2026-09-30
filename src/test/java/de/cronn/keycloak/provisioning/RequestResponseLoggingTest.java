@@ -8,11 +8,13 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.cronn.assertions.validationfile.normalization.UuidNormalizer;
+import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.LoggerFactory;
@@ -99,6 +101,27 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
 
     assertThat(messages()).noneMatch(message -> message.contains("t0p-s3cr3t"));
     assertThat(messages()).noneMatch(message -> message.contains("\"access_token\":\"ey"));
+  }
+
+  /** A password travels as a credential's {@code value}, which is why that key is masked too. */
+  @Test
+  void neverLogsAPasswordVerbatim() {
+    logger.setLevel(Level.TRACE);
+
+    UserRepresentation user = new UserRepresentation();
+    user.setUsername("logged-user");
+    user.setEnabled(true);
+    user.setEmail("logged-user@example.com");
+    CredentialRepresentation password = new CredentialRepresentation();
+    password.setType(CredentialRepresentation.PASSWORD);
+    password.setValue("Str0ng-P4ssw0rd!");
+    password.setTemporary(false);
+    user.setCredentials(List.of(password));
+
+    withRealmManager(
+        realmManager -> new TestUserProvisioner(realmManager).provisionUsers(List.of(user)));
+
+    assertThat(messages()).noneMatch(message -> message.contains("Str0ng-P4ssw0rd!"));
   }
 
   @Test

@@ -12,10 +12,16 @@ final class KeycloakLoggedBody {
   private static final int HEAD_LENGTH = 64 * 1024;
   private static final int TAIL_LENGTH = 4 * 1024;
 
+  /**
+   * The value alternatives matter as much as the key list: {@code (?:\\.|[^"\\])*} consumes escaped
+   * quotes, so a secret containing one cannot end the match early and leak its tail, and the
+   * non-string branch covers a numeric or null value that would otherwise pass through verbatim.
+   */
   private static final Pattern SECRETS =
       Pattern.compile(
-          "\"(access_token|refresh_token|id_token|secret|value|credentials|privateKey|"
-              + "client_secret|password)\"\\s*:\\s*\"[^\"]*\"",
+          "\"(access_token|refresh_token|id_token|secret|secretData|credentialData|value|"
+              + "credentials|privateKey|client_secret|clientSecret|password)\"\\s*:\\s*"
+              + "(?:\"(?:\\\\.|[^\"\\\\])*\"|[^,}\\]\\s]+)",
           Pattern.CASE_INSENSITIVE);
 
   private KeycloakLoggedBody() {}
