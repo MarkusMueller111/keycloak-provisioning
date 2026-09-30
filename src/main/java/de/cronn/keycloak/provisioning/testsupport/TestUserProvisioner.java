@@ -67,9 +67,8 @@ public final class TestUserProvisioner {
   }
 
   /**
-   * Keycloak ignores all three on the user creation and this class provisions none of them, so a
-   * declaration would look applied while nothing was granted. Assign them through {@link
-   * RealmManager} once the users exist.
+   * Keycloak ignores all three on creation and this class provisions none of them, so a declaration
+   * would look applied while nothing was granted.
    */
   private static void assertNoMembershipsAreDeclared(UserRepresentation user) {
     assertNotDeclared(user.getUsername(), "realmRoles", user.getRealmRoles());

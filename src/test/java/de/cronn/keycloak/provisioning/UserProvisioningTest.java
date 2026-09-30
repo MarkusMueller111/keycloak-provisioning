@@ -20,7 +20,6 @@ class UserProvisioningTest extends SharedKeycloakTest {
     assertThat(usernames()).contains("alice", "bob");
   }
 
-  /** The same bug class as the create-only client flags: these must reconcile on update. */
   @Test
   void provisionsUserFieldsOnUpdate() {
     UserRepresentation initial = user("alice");
@@ -43,7 +42,6 @@ class UserProvisioningTest extends SharedKeycloakTest {
     assertThat(actual.getRequiredActions()).containsExactly("UPDATE_PASSWORD");
   }
 
-  /** Full desired state, so dropping a user from the list removes it. */
   @Test
   void deletesUsersThatAreNoLongerConfigured() {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
@@ -88,11 +86,7 @@ class UserProvisioningTest extends SharedKeycloakTest {
     assertThat(usernames()).doesNotContain("alice", "Alice");
   }
 
-  /**
-   * The only thing protecting the connection's own identity from a provisioning that deletes every
-   * user not in the list, and it is Keycloak's behaviour rather than ours: service accounts are
-   * left out of the user listing this walks.
-   */
+  /** Keycloak leaves service accounts out of the user listing, which is what protects them. */
   @Test
   void leavesServiceAccountUsersAlone() {
     ClientRepresentation serviceAccountClient = new ClientRepresentation();
