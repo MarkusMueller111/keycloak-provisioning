@@ -3,6 +3,7 @@ package de.cronn.keycloak.provisioning;
 import java.util.Objects;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.representations.idm.ClientRepresentation;
+import org.keycloak.representations.idm.ClientScopeRepresentation;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 
@@ -23,27 +24,37 @@ public final class ManagedNaming {
   public static final String STANDARD_CLIENT_PREFIX = "system-";
   public static final String STANDARD_GROUP_PREFIX = "[System] ";
   public static final String STANDARD_ROLE_PREFIX = "system-";
+  public static final String STANDARD_CLIENT_SCOPE_PREFIX = "system-";
 
   private final String clientPrefix;
   private final String groupPrefix;
   private final String rolePrefix;
+  private final String clientScopePrefix;
 
-  private ManagedNaming(String clientPrefix, String groupPrefix, String rolePrefix) {
+  private ManagedNaming(
+      String clientPrefix, String groupPrefix, String rolePrefix, String clientScopePrefix) {
     this.clientPrefix = Validate.notBlank(clientPrefix, "client prefix must not be blank");
     this.groupPrefix = Validate.notBlank(groupPrefix, "group prefix must not be blank");
     this.rolePrefix = Validate.notBlank(rolePrefix, "role prefix must not be blank");
+    this.clientScopePrefix =
+        Validate.notBlank(clientScopePrefix, "client scope prefix must not be blank");
   }
 
   public static ManagedNaming standard() {
-    return new ManagedNaming(STANDARD_CLIENT_PREFIX, STANDARD_GROUP_PREFIX, STANDARD_ROLE_PREFIX);
+    return new ManagedNaming(
+        STANDARD_CLIENT_PREFIX,
+        STANDARD_GROUP_PREFIX,
+        STANDARD_ROLE_PREFIX,
+        STANDARD_CLIENT_SCOPE_PREFIX);
   }
 
   /**
    * Every prefix has to be given: group names are shown to people in the admin console, so reusing
    * a technical client prefix there produces names nobody wants to read.
    */
-  public static ManagedNaming custom(String clientPrefix, String groupPrefix, String rolePrefix) {
-    return new ManagedNaming(clientPrefix, groupPrefix, rolePrefix);
+  public static ManagedNaming custom(
+      String clientPrefix, String groupPrefix, String rolePrefix, String clientScopePrefix) {
+    return new ManagedNaming(clientPrefix, groupPrefix, rolePrefix, clientScopePrefix);
   }
 
   public ManagedName clientId(String clientId) {
@@ -56,6 +67,10 @@ public final class ManagedNaming {
 
   public ManagedName roleName(String roleName) {
     return name(ManagedEntity.ROLE, roleName);
+  }
+
+  public ManagedName clientScopeName(String clientScopeName) {
+    return name(ManagedEntity.CLIENT_SCOPE, clientScopeName);
   }
 
   /**
@@ -75,6 +90,10 @@ public final class ManagedNaming {
     return isManaged(ManagedEntity.ROLE, role.getName());
   }
 
+  public boolean isManaged(ClientScopeRepresentation clientScope) {
+    return isManaged(ManagedEntity.CLIENT_SCOPE, clientScope.getName());
+  }
+
   /** For the cases where only the name is at hand; prefer the representation overloads. */
   public boolean isManaged(ManagedEntity entity, String name) {
     return Objects.requireNonNull(name).startsWith(prefix(entity));
@@ -85,6 +104,7 @@ public final class ManagedNaming {
       case CLIENT -> clientPrefix;
       case GROUP -> groupPrefix;
       case ROLE -> rolePrefix;
+      case CLIENT_SCOPE -> clientScopePrefix;
     };
   }
 
@@ -103,6 +123,7 @@ public final class ManagedNaming {
   public enum ManagedEntity {
     CLIENT,
     GROUP,
-    ROLE
+    ROLE,
+    CLIENT_SCOPE
   }
 }

@@ -131,7 +131,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   /** A custom naming has to reach the deletion fence, not just the ids it mints. */
   @Test
   void scopesDeletionToTheConfiguredPrefix() {
-    ManagedNaming acme = ManagedNaming.custom("acme-", "[Acme] ", "acme-");
+    ManagedNaming acme = ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-");
     KeycloakDefaultConnectionConfig config =
         new KeycloakDefaultConnectionConfig(
             serverUrl(),
