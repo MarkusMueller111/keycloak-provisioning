@@ -6,6 +6,7 @@ import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.Differ;
+import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
@@ -31,6 +32,7 @@ import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.admin.client.resource.ClientsResource;
 import org.keycloak.admin.client.resource.GroupResource;
 import org.keycloak.admin.client.resource.GroupsResource;
+import org.keycloak.admin.client.resource.ProtocolMappersResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RoleResource;
 import org.keycloak.admin.client.resource.RoleScopeResource;
@@ -42,6 +44,7 @@ import org.keycloak.representations.idm.AuthenticationExecutionInfoRepresentatio
 import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
+import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -353,6 +356,56 @@ public class RealmManager {
     clientDiffer.getElementsToUpdate().forEach(this::updateClient);
 
     provisionClientScopeAssignments(clients);
+    provisionClientProtocolMappers(clients);
+  }
+
+  /**
+   * A {@code null} mapper list means "not configured", an empty one removes every mapper. Keycloak
+   * returns mappers in its own order and with ids of its own, so they are matched by name.
+   */
+  private void provisionClientProtocolMappers(List<ClientRepresentation> clients) {
+    for (ClientRepresentation client : clients) {
+      if (client.getProtocolMappers() == null) {
+        continue;
+      }
+      getClientByClientId(client.getClientId())
+          .ifPresent(
+              clientResource ->
+                  provisionProtocolMappers(
+                      clientResource.getProtocolMappers(),
+                      client.getProtocolMappers(),
+                      client.getClientId()));
+    }
+  }
+
+  private void provisionProtocolMappers(
+      ProtocolMappersResource mappersResource,
+      List<ProtocolMapperRepresentation> desiredMappers,
+      String owner) {
+    List<ProtocolMapperRepresentation> existingMappers = mappersResource.getMappers();
+    ProtocolMapperDiffer differ =
+        new ProtocolMapperDiffer(
+            existingMappers == null ? List.of() : existingMappers, desiredMappers);
+
+    for (ProtocolMapperRepresentation mapper : differ.getElementsToDelete()) {
+      log.info("Removing protocol mapper '{}' from '{}'", mapper.getName(), owner);
+      mappersResource.delete(mapper.getId());
+    }
+    for (ProtocolMapperRepresentation mapper : differ.getElementsToAdd()) {
+      log.info("Adding protocol mapper '{}' to '{}'", mapper.getName(), owner);
+      try (Response response = mappersResource.createMapper(mapper)) {
+        assertResponseIs201Created(response);
+      }
+    }
+    for (ToUpdate<ProtocolMapperRepresentation> update : differ.getElementsToUpdate()) {
+      ProtocolMapperRepresentation mapper = update.newState();
+      log.info(
+          "Protocol mapper '{}' of '{}' requires an update:\n{}",
+          mapper.getName(),
+          owner,
+          update.multiLineDiff());
+      mappersResource.update(mapper.getId(), mapper);
+    }
   }
 
   /**
