@@ -10,7 +10,9 @@ import java.util.stream.Collectors;
 
 public final class Differ {
 
-  private static final List<String> MASKED_JSON_KEYS = List.of("password", "secret");
+  /** Diffs are logged at INFO, so this has to cover what a representation can carry verbatim. */
+  private static final List<String> MASKED_JSON_KEYS =
+      List.of("password", "secret", "secretData", "credentialData", "value", "privateKey");
 
   private Differ() {
     throw new IllegalStateException("Utility class");

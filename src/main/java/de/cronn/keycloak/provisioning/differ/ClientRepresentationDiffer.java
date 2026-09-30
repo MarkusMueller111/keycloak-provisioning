@@ -16,8 +16,14 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setAdminUrl(source.getAdminUrl());
       target.setDirectAccessGrantsEnabled(source.isDirectAccessGrantsEnabled());
       target.setStandardFlowEnabled(source.isStandardFlowEnabled());
+      target.setImplicitFlowEnabled(source.isImplicitFlowEnabled());
       target.setServiceAccountsEnabled(source.isServiceAccountsEnabled());
       target.setAuthorizationServicesEnabled(source.getAuthorizationServicesEnabled());
+      target.setBearerOnly(source.isBearerOnly());
+      target.setConsentRequired(source.isConsentRequired());
+      target.setFullScopeAllowed(source.isFullScopeAllowed());
+      target.setClientAuthenticatorType(source.getClientAuthenticatorType());
+      target.setAuthenticationFlowBindingOverrides(source.getAuthenticationFlowBindingOverrides());
       target.setProtocol(source.getProtocol());
       target.setFrontchannelLogout(source.isFrontchannelLogout());
       target.setRedirectUris(source.getRedirectUris());
@@ -30,6 +36,9 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setEnabled(source.isEnabled());
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
       // so RealmManager provisions them through the dedicated endpoints afterwards.
+      // protocolMappers and authorizationSettings are left out for a different reason, and with
+      // nothing provisioning them instead: they are object graphs this library does not model yet.
+      // The client update does honour protocolMappers, so they can move in here once it does.
     };
   }
 

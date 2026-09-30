@@ -1,5 +1,6 @@
 package de.cronn.keycloak.provisioning.testsupport;
 
+import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.Usernames;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
@@ -49,6 +50,7 @@ public final class TestUserProvisioner {
    */
   public void provisionUsers(List<UserRepresentation> users) {
     users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
+    users.forEach(TestUserProvisioner::assertNoMembershipsAreDeclared);
 
     List<UserRepresentation> existingUsers =
         users.stream()
@@ -62,6 +64,28 @@ public final class TestUserProvisioner {
 
     users.forEach(this::applyCredentials);
     removeUsersNotIn(users);
+  }
+
+  /**
+   * Keycloak ignores all three on the user creation and this class provisions none of them, so a
+   * declaration would look applied while nothing was granted. Assign them through {@link
+   * RealmManager} once the users exist.
+   */
+  private static void assertNoMembershipsAreDeclared(UserRepresentation user) {
+    assertNotDeclared(user.getUsername(), "realmRoles", user.getRealmRoles());
+    assertNotDeclared(user.getUsername(), "clientRoles", user.getClientRoles());
+    assertNotDeclared(user.getUsername(), "groups", user.getGroups());
+  }
+
+  private static void assertNotDeclared(String username, String what, Object value) {
+    if (value != null) {
+      throw new KeycloakException(
+          "User '"
+              + username
+              + "' declares "
+              + what
+              + ", which this provisioner does not apply. Grant them through RealmManager instead.");
+    }
   }
 
   /**

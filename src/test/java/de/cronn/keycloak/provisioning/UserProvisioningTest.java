@@ -7,6 +7,7 @@ import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
@@ -85,6 +86,57 @@ class UserProvisioningTest extends SharedKeycloakTest {
         .hasMessageContaining("Alice");
 
     assertThat(usernames()).doesNotContain("alice", "Alice");
+  }
+
+  /**
+   * The only thing protecting the connection's own identity from a provisioning that deletes every
+   * user not in the list, and it is Keycloak's behaviour rather than ours: service accounts are
+   * left out of the user listing this walks.
+   */
+  @Test
+  void leavesServiceAccountUsersAlone() {
+    ClientRepresentation serviceAccountClient = new ClientRepresentation();
+    serviceAccountClient.setClientId("system-with-service-account");
+    serviceAccountClient.setEnabled(true);
+    serviceAccountClient.setPublicClient(false);
+    serviceAccountClient.setServiceAccountsEnabled(true);
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(serviceAccountClient)));
+    String serviceAccountId = serviceAccountUserId();
+
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+
+    assertThat(serviceAccountUserId()).isEqualTo(serviceAccountId);
+  }
+
+  private String serviceAccountUserId() {
+    String id =
+        adminClient()
+            .realm(REALM)
+            .clients()
+            .findByClientId("system-with-service-account")
+            .getFirst()
+            .getId();
+    return adminClient().realm(REALM).clients().get(id).getServiceAccountUser().getId();
+  }
+
+  /** Keycloak ignores these on creation and this provisioner applies none of them. */
+  @Test
+  void rejectsAUserDeclaringRolesOrGroups() {
+    UserRepresentation withRoles = user("alice");
+    withRoles.setRealmRoles(List.of("some-role"));
+
+    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withRoles))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("realmRoles");
+
+    UserRepresentation withGroups = user("bob");
+    withGroups.setGroups(List.of("some-group"));
+
+    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withGroups))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("groups");
+
+    assertThat(usernames()).doesNotContain("alice", "bob");
   }
 
   private void withTestUserProvisioner(Consumer<TestUserProvisioner> action) {

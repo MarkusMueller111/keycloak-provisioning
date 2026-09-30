@@ -15,7 +15,7 @@ public class UserRepresentationDiffer extends AbstractDiffer<UserRepresentation>
       target.setRequiredActions(source.getRequiredActions());
       target.setAttributes(source.getAttributes());
       // Credentials are left out: Keycloak never returns their value, so a diff could not see a
-      // change. RealmManager sets them separately whenever the desired user carries any.
+      // change. TestUserProvisioner applies them separately whenever a desired user carries any.
     };
   }
 
