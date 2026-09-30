@@ -9,10 +9,12 @@ import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentia
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
+import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 
 class ClientProvisioningTest extends SharedKeycloakTest {
 
@@ -442,6 +444,77 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
     assertThat(defaultScopeNames("system-a")).containsExactlyInAnyOrder("profile", "email");
     assertThat(optionalScopeNames("system-a")).isEmpty();
+  }
+
+  @Test
+  void provisionsTheConfiguredProtocolMappers() {
+    ClientRepresentation initial = client("system-a");
+    initial.setProtocolMappers(
+        List.of(hardcodedClaim("kept", "one"), hardcodedClaim("dropped", "x")));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(initial)));
+    assertThat(mapperNames("system-a")).containsExactlyInAnyOrder("kept", "dropped");
+
+    ClientRepresentation changed = client("system-a");
+    changed.setProtocolMappers(List.of(hardcodedClaim("kept", "two")));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(changed)));
+
+    assertThat(mapperNames("system-a")).containsExactly("kept");
+    assertThat(mapperConfig("system-a", "kept")).containsEntry("claim.value", "two");
+  }
+
+  /** Null means "not configured", so mappers Keycloak or a consumer added survive. */
+  @Test
+  void leavesProtocolMappersAloneWhenNoneAreConfigured() {
+    ClientRepresentation withMapper = client("system-a");
+    withMapper.setProtocolMappers(List.of(hardcodedClaim("kept", "one")));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(withMapper)));
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    assertThat(mapperNames("system-a")).containsExactly("kept");
+  }
+
+  @Test
+  void removesEveryProtocolMapperWhenAnEmptyListIsConfigured() {
+    ClientRepresentation withMapper = client("system-a");
+    withMapper.setProtocolMappers(List.of(hardcodedClaim("kept", "one")));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(withMapper)));
+
+    ClientRepresentation none = client("system-a");
+    none.setProtocolMappers(List.of());
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(none)));
+
+    assertThat(mapperNames("system-a")).isEmpty();
+  }
+
+  private static ProtocolMapperRepresentation hardcodedClaim(String name, String value) {
+    ProtocolMapperRepresentation mapper = new ProtocolMapperRepresentation();
+    mapper.setName(name);
+    mapper.setProtocol("openid-connect");
+    mapper.setProtocolMapper("oidc-hardcoded-claim-mapper");
+    mapper.setConfig(
+        new java.util.LinkedHashMap<>(
+            Map.of(
+                "claim.name", name,
+                "claim.value", value,
+                "access.token.claim", "true")));
+    return mapper;
+  }
+
+  private List<String> mapperNames(String clientId) {
+    List<ProtocolMapperRepresentation> mappers =
+        clientResource(clientId).getProtocolMappers().getMappers();
+    return mappers == null
+        ? List.of()
+        : mappers.stream().map(ProtocolMapperRepresentation::getName).toList();
+  }
+
+  private Map<String, String> mapperConfig(String clientId, String mapperName) {
+    return clientResource(clientId).getProtocolMappers().getMappers().stream()
+        .filter(mapper -> mapperName.equals(mapper.getName()))
+        .findFirst()
+        .orElseThrow()
+        .getConfig();
   }
 
   private static ClientRepresentation client(String clientId) {

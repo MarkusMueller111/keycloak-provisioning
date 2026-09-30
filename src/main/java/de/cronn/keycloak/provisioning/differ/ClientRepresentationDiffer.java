@@ -36,8 +36,8 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setEnabled(source.isEnabled());
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
       // so RealmManager provisions them through the dedicated endpoints afterwards.
-      // protocolMappers and authorizationSettings are left out with nothing provisioning them
-      // instead: not modelled yet. The client update does honour protocolMappers.
+      // So are protocol mappers: Keycloak returns them with ids and in its own order, so
+      // RealmManager provisions them by name afterwards. authorizationSettings is not modelled.
     };
   }
 
