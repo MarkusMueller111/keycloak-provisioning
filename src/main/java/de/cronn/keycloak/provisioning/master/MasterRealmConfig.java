@@ -4,6 +4,7 @@ import de.cronn.keycloak.provisioning.AuthenticationManagementConfig;
 import de.cronn.keycloak.provisioning.BuiltInClientConfig;
 import de.cronn.keycloak.provisioning.KeycloakProvidedClient;
 import de.cronn.keycloak.provisioning.KeycloakProvidedRequiredAction;
+import de.cronn.keycloak.provisioning.PasswordPolicy;
 import de.cronn.keycloak.provisioning.SecurityHeader;
 import de.cronn.keycloak.provisioning.SslRequired;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
@@ -27,17 +28,6 @@ import org.keycloak.representations.idm.RealmRepresentation;
  */
 public final class MasterRealmConfig {
 
-  static final String DEFAULT_PASSWORD_POLICY =
-      String.join(
-          " and ",
-          "length(12)",
-          "notContainsUsername",
-          "upperCase(1)",
-          "lowerCase(1)",
-          "digits(1)",
-          "specialChars(1)",
-          "maxAuthAge(0)");
-
   private final String frontendUrl;
   private final PermanentAdmin permanentAdmin;
   private final Smtp smtp;
@@ -60,7 +50,7 @@ public final class MasterRealmConfig {
     this.permanentAdmin = Objects.requireNonNull(builder.permanentAdmin);
     this.smtp = builder.smtp;
     this.passwordPolicy =
-        builder.passwordPolicy == null ? DEFAULT_PASSWORD_POLICY : builder.passwordPolicy;
+        builder.passwordPolicy == null ? PasswordPolicy.DEFAULT : builder.passwordPolicy;
     this.sessionIdleTimeout =
         builder.sessionIdleTimeout == null ? Duration.ofMinutes(5) : builder.sessionIdleTimeout;
     this.sessionMaxLifespan =
