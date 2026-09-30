@@ -19,7 +19,10 @@ public record BuiltInClientConfig(
     KeycloakProvidedClient client, boolean enabled, Consumer<ClientRepresentation> customizer) {
 
   public static final List<BuiltInClientConfig> BUILT_IN_CLIENT_DEFAULTS =
-      List.of(defaultBrokerBuilder().build(), defaultAccountBuilder().build());
+      List.of(
+          defaultBrokerBuilder().build(),
+          defaultAccountBuilder().build(),
+          defaultAdminCliBuilder().build());
 
   public BuiltInClientConfig {
     Objects.requireNonNull(client, "client must not be null");
@@ -33,6 +36,19 @@ public record BuiltInClientConfig(
   /** Disabled: it only matters for identity brokering, which most realms do not use. */
   public static Builder defaultBrokerBuilder() {
     return forClient(KeycloakProvidedClient.BROKER).enabled(false);
+  }
+
+  /**
+   * Disabled: it enables the direct access grant, i.e. a password grant that bypasses the browser
+   * flow including any 2FA configured there.
+   *
+   * <p>Declare it {@code enabled(true)} when provisioning connects via {@code
+   * KeycloakAdminCliConnectionManager} and relies on {@code admin-cli} as a fallback. Disabling it
+   * does not cost you the admin console, which authenticates through {@code
+   * security-admin-console}.
+   */
+  public static Builder defaultAdminCliBuilder() {
+    return forClient(KeycloakProvidedClient.ADMIN_CLI).enabled(false);
   }
 
   /** The account console needs it enabled, but reaches it through {@code account-console}. */

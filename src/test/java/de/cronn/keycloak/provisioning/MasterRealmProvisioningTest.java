@@ -45,6 +45,29 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(account.isStandardFlowEnabled()).isFalse();
   }
 
+  /**
+   * The default without any builtInClients of its own, so it also pins that dropping the former
+   * disableAdminCliClient flag did not lose the hardening it applied.
+   */
+  @Test
+  void disablesAdminCliByDefault() {
+    provision(
+        MasterRealmConfig.builder(serverUrl(), PermanentAdmin.none())
+            .deleteTemporaryAdminUsers(false)
+            .build());
+
+    withMaster(
+        realmManager ->
+            assertThat(
+                    realmManager
+                        .getRealmResource()
+                        .clients()
+                        .findByClientId("admin-cli")
+                        .getFirst()
+                        .isEnabled())
+                .isFalse());
+  }
+
   @Test
   void disablesTheAccountClientWhenItIsExplicitlyListed() {
     provision(
@@ -56,6 +79,11 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
                         .build(),
                     BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT_CONSOLE)
                         .enabled(false)
+                        .build(),
+                    // This call replaces configBuilder's list, so re-declare the connection these
+                    // assertions read back with.
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(true)
                         .build()))
             .build());
 
@@ -124,6 +152,33 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(defaultRoleCompositeNames()).contains("offline_access", "uma_authorization");
   }
 
+  /**
+   * A disabled client is still worth hardening, in case it is ever enabled again by hand. Asserted
+   * through the provisioning client, since disabling admin-cli cuts off the connection the other
+   * tests here read back with.
+   */
+  @Test
+  void customizesAdminCliWhileDisablingIt() {
+    provision(
+        MasterRealmConfig.builder(serverUrl(), PermanentAdmin.none())
+            .deleteTemporaryAdminUsers(false)
+            .builtInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(false)
+                        .customizer(client -> client.setRedirectUris(List.of()))
+                        .build()))
+            .build());
+
+    withMaster(
+        realmManager -> {
+          ClientRepresentation adminCli =
+              realmManager.getRealmResource().clients().findByClientId("admin-cli").getFirst();
+          assertThat(adminCli.isEnabled()).isFalse();
+          assertThat(adminCli.getRedirectUris()).isEmpty();
+        });
+  }
+
   @Test
   void permanentAdminNoneCreatesNoUser() {
     long usersBefore = masterUserCount();
@@ -140,7 +195,11 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
   private MasterRealmConfig.Builder configBuilder(PermanentAdmin permanentAdmin) {
     return MasterRealmConfig.builder(serverUrl(), permanentAdmin)
         .deleteTemporaryAdminUsers(false)
-        .disableAdminCliClient(false);
+        .builtInClients(
+            List.of(
+                BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                    .enabled(true)
+                    .build()));
   }
 
   private void provision(MasterRealmConfig config) {

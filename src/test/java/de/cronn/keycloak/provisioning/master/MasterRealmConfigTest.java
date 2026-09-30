@@ -53,6 +53,32 @@ class MasterRealmConfigTest {
         .hasMessageContaining("realm-management");
   }
 
+  /**
+   * admin-cli is disabled by default: it enables a password grant that bypasses the browser flow.
+   */
+  @Test
+  void disablesAdminCliByDefault() {
+    MasterRealmConfig config = builder().build();
+
+    assertThat(config.builtInClients())
+        .anyMatch(c -> c.client() == KeycloakProvidedClient.ADMIN_CLI && !c.enabled());
+  }
+
+  @Test
+  void letsAdminCliBeKeptEnabled() {
+    MasterRealmConfig config =
+        builder()
+            .builtInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(true)
+                        .build()))
+            .build();
+
+    assertThat(config.builtInClients())
+        .anyMatch(c -> c.client() == KeycloakProvidedClient.ADMIN_CLI && c.enabled());
+  }
+
   @Test
   void rejectsTheSameClientTwice() {
     assertThatThrownBy(

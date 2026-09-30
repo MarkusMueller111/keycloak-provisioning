@@ -267,9 +267,13 @@ connection relies on it as a fallback:
 
 ```java
 MasterRealmConfig.builder(url, permanentAdmin)
-    .disableAdminCliClient(false) // default: true
+    .builtInClients(List.of(
+        BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI).enabled(true).build()))
     .build();
 ```
+
+Declarations are merged over the defaults per client, so naming `admin-cli` leaves the other
+built-ins at theirs.
 
 Disabling it does not lock you out of the admin console, which signs in through a different client.
 
