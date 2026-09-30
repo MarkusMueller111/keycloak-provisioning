@@ -150,9 +150,15 @@ public class RealmManager {
    * consumer provisioned are out of scope, those belong to {@link #createOrUpdateClients(List)}.
    */
   public void reconcileBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
-    Map<KeycloakProvidedClient, BuiltInClientConfig> byClient =
-        builtInClients.stream()
-            .collect(Collectors.toMap(BuiltInClientConfig::client, config -> config));
+    Map<KeycloakProvidedClient, BuiltInClientConfig> byClient = new LinkedHashMap<>();
+    for (BuiltInClientConfig config : builtInClients) {
+      // Before the first write: two entries for one client contradict each other, and reporting
+      // that half-way through leaves the realm partly reconciled.
+      Validate.isTrue(
+          byClient.put(config.client(), config) == null,
+          "Client '%s' is configured more than once",
+          config.client().getClientId());
+    }
 
     ClientsResource clientsResource = getRealmResource().clients();
     Map<String, ClientRepresentation> existingByClientId =
