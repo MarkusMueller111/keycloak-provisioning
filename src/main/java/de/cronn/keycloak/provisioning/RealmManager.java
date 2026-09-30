@@ -238,8 +238,59 @@ public class RealmManager {
   public void provisionManagedClients(List<ClientRepresentation> clients) {
     clients.forEach(this::assertClientIsManaged);
     clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
+    clients.forEach(RealmManager::assertRedirectUrisAreNotWildcards);
+    clients.forEach(RealmManager::applySecurityFlagDefaults);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
     provisionManagedClients(clients, existingClientsPredicate);
+  }
+
+  /**
+   * A representation leaves these null until they are set, and copying null over the server's value
+   * leaves whatever is there — so an undeclared flag could never be provisioned away. Undeclared
+   * therefore means off, which is also the safe reading: {@code fullScopeAllowed} in particular
+   * defaults to {@code true} in Keycloak, putting every role the user holds into the client's
+   * tokens regardless of its scope. Declare a flag explicitly to opt back in.
+   */
+  private static void applySecurityFlagDefaults(ClientRepresentation client) {
+    if (client.isFullScopeAllowed() == null) {
+      client.setFullScopeAllowed(false);
+    }
+    if (client.isImplicitFlowEnabled() == null) {
+      client.setImplicitFlowEnabled(false);
+    }
+    if (client.isBearerOnly() == null) {
+      client.setBearerOnly(false);
+    }
+    if (client.isConsentRequired() == null) {
+      client.setConsentRequired(false);
+    }
+  }
+
+  /**
+   * A wildcard lets any URI under it receive the authorization code, so anyone who can host content
+   * there can complete the flow. Keycloak accepts them; this does not.
+   */
+  private static void assertRedirectUrisAreNotWildcards(ClientRepresentation client) {
+    assertNoWildcards(client.getClientId(), "redirect URI", client.getRedirectUris());
+    assertNoWildcards(client.getClientId(), "web origin", client.getWebOrigins());
+  }
+
+  private static void assertNoWildcards(String clientId, String what, List<String> values) {
+    if (values == null) {
+      return;
+    }
+    for (String value : values) {
+      if (value.contains("*")) {
+        throw new KeycloakException(
+            "Client '"
+                + clientId
+                + "' declares the wildcard "
+                + what
+                + " '"
+                + value
+                + "'. List the exact values instead.");
+      }
+    }
   }
 
   /**
@@ -537,13 +588,15 @@ public class RealmManager {
             .filter(flow -> flow.isBuiltIn() != Boolean.TRUE)
             .toList();
 
+    // Create before deleting: renaming a flow would otherwise leave a window with neither, and a
+    // realm binding pointing at the old one breaks for good if the create then fails.
+    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows));
+
     Set<String> configuredAliases =
         flows.stream().map(AuthenticationFlowRepresentation::getAlias).collect(Collectors.toSet());
     existingFlows.stream()
         .filter(flow -> !configuredAliases.contains(flow.getAlias()))
         .forEach(this::deleteFlow);
-
-    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows));
   }
 
   private void createOrUpdateFlow(

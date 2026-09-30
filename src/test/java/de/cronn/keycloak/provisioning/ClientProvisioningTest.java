@@ -342,6 +342,65 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(actual.isServiceAccountsEnabled()).isFalse();
   }
 
+  /** These were settable but never diffed, so drift in them was invisible and never corrected. */
+  @Test
+  void revertsSecurityFlagsChangedOutOfBand() {
+    ClientRepresentation declared = client("system-a");
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(declared)));
+
+    ClientRepresentation drifted = findClient("system-a");
+    drifted.setImplicitFlowEnabled(true);
+    drifted.setFullScopeAllowed(true);
+    drifted.setConsentRequired(true);
+    drifted.setBearerOnly(true);
+    adminClient().realm(REALM).clients().get(drifted.getId()).update(drifted);
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    ClientRepresentation actual = findClient("system-a");
+    assertThat(actual.isImplicitFlowEnabled()).isFalse();
+    assertThat(actual.isFullScopeAllowed()).isFalse();
+    assertThat(actual.isConsentRequired()).isFalse();
+    assertThat(actual.isBearerOnly()).isFalse();
+  }
+
+  /** Keycloak defaults this to true, which would put every role a user holds into the tokens. */
+  @Test
+  void defaultsFullScopeAllowedToFalse() {
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    assertThat(findClient("system-a").isFullScopeAllowed()).isFalse();
+  }
+
+  @Test
+  void letsAClientOptBackIntoFullScope() {
+    ClientRepresentation client = client("system-a");
+    client.setFullScopeAllowed(true);
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client)));
+
+    assertThat(findClient("system-a").isFullScopeAllowed()).isTrue();
+  }
+
+  @Test
+  void rejectsWildcardRedirectUrisAndWebOrigins() {
+    ClientRepresentation wildcardRedirect = client("system-a");
+    wildcardRedirect.setRedirectUris(List.of("https://app.example.com/*"));
+
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(wildcardRedirect))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("redirect URI");
+
+    ClientRepresentation wildcardOrigin = client("system-b");
+    wildcardOrigin.setWebOrigins(List.of("*"));
+
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(wildcardOrigin))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("web origin");
+  }
+
   /**
    * Safe to provision because a managed client can never be one of Keycloak's own: those carry no
    * prefix, and this method rejects anything without one.
