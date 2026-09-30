@@ -197,6 +197,20 @@ accounts**. Service accounts are unaffected, as Keycloak keeps them out of the u
 Credentials on a user are applied on every run rather than diffed. Keycloak never returns a
 credential's value, so there is no way to tell whether it still matches.
 
+### Client hardening
+
+A managed client gets `fullScopeAllowed=false` unless it declares otherwise. Keycloak's own default
+is `true`, which puts every role the user holds into that client's tokens regardless of its scope —
+so a token leaked from a low-value application still asserts whatever else that user can do. Opt
+back in per client if your application reads roles it was never scoped for:
+
+```java
+client.setFullScopeAllowed(true);
+```
+
+Wildcard redirect URIs and web origins are rejected: a wildcard lets any URI under it receive the
+authorization code, so anyone who can host content there can complete the flow.
+
 ### Client scopes
 
 Declare both scope lists on a client, or neither:
@@ -214,10 +228,14 @@ a half-declared client rather than letting that happen.
 
 ### Naming
 
-The provisioning methods only ever delete objects carrying the configured prefix, which is what keeps
-them away from anything you did not provision. A realm therefore has to keep the same naming for its
-whole lifetime: changing it orphans everything provisioned under the old prefix and pulls unrelated
-objects into scope for deletion.
+`provisionManagedClients` only ever deletes clients carrying the configured prefix, which is what
+keeps it away from anything you did not provision. A realm therefore has to keep the same naming for
+its whole lifetime: changing it orphans everything provisioned under the old prefix and pulls
+unrelated objects into scope for deletion.
+
+The prefix fences clients only. `provisionFlows` is bounded by Keycloak's own built-in flag, so
+every flow it did not create is in scope — **including ones made by hand in the admin console** —
+and `provisionUsers` has no fence at all.
 
 ```java
 ManagedNaming.standard()                            // "system-", "[System] ", "system-"
