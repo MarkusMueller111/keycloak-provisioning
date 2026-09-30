@@ -125,6 +125,18 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(findExecution(FLOW, "auth-cookie").getRequirement()).isEqualTo("REQUIRED");
   }
 
+  /** The fence is Keycloak's built-in flag, not our prefix, so a console-made flow is in scope. */
+  @Test
+  void deletesAFlowCreatedOutsideThisLibrary() {
+    AuthenticationFlowRepresentation byHand = flow("made-in-the-console", "not ours");
+    adminClient().realm(REALM).flows().createFlow(byHand);
+    assertThat(flowAliases()).contains("made-in-the-console");
+
+    withRealmManager(rm -> rm.provisionFlows(List.of(flow(FLOW, "a test flow"))));
+
+    assertThat(flowAliases()).contains(FLOW).doesNotContain("made-in-the-console");
+  }
+
   /** Keycloak appends a new execution, so its declared position only holds if we write it back. */
   @Test
   void placesANewExecutionAtItsDeclaredPosition() {

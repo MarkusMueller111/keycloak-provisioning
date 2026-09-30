@@ -132,6 +132,32 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(masterUser(ADMIN_USERNAME)).isNotNull();
   }
 
+  /**
+   * The production default, which no other test here exercises: provision() has to create the
+   * permanent admin before deleting the temporary ones, or the realm is left with no way back in.
+   */
+  @Test
+  void deletesTheTemporaryAdminsOnlyAfterCreatingThePermanentOne() {
+    provision(
+        MasterRealmConfig.builder(
+                serverUrl(),
+                new PermanentAdmin.Standard(
+                    "permanent-admin", "Str0ng-P4ssw0rd!", "admin@example.com"))
+            .deleteTemporaryAdminUsers(true)
+            .builtInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(true)
+                        .build()))
+            .build());
+
+    withMaster(
+        realmManager -> {
+          assertThat(realmManager.getUserByUsername("permanent-admin")).isPresent();
+          assertThat(realmManager.getUsersMarkedAsTemporaryAdmin()).isEmpty();
+        });
+  }
+
   /** The full desired set, so Keycloak's own composites go unless they are declared again. */
   @Test
   void replacesTheDefaultRoleCompositesThatAreNotDeclared() {
