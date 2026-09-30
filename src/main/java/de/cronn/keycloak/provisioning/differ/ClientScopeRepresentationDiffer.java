@@ -10,6 +10,8 @@ public class ClientScopeRepresentationDiffer extends AbstractDiffer<ClientScopeR
       target.setDescription(source.getDescription());
       target.setProtocol(source.getProtocol());
       target.setAttributes(source.getAttributes());
+      // The mappers are most of what a scope is, so leaving them out would diff away the point.
+      target.setProtocolMappers(source.getProtocolMappers());
     };
   }
 
