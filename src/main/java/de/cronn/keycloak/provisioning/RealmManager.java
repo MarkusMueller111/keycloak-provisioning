@@ -244,13 +244,7 @@ public class RealmManager {
     provisionManagedClients(clients, existingClientsPredicate);
   }
 
-  /**
-   * A representation leaves these null until they are set, and copying null over the server's value
-   * leaves whatever is there — so an undeclared flag could never be provisioned away. Undeclared
-   * therefore means off, which is also the safe reading: {@code fullScopeAllowed} in particular
-   * defaults to {@code true} in Keycloak, putting every role the user holds into the client's
-   * tokens regardless of its scope. Declare a flag explicitly to opt back in.
-   */
+  /** Undeclared means off; Keycloak defaults {@code fullScopeAllowed} to {@code true}. */
   private static void applySecurityFlagDefaults(ClientRepresentation client) {
     if (client.isFullScopeAllowed() == null) {
       client.setFullScopeAllowed(false);
@@ -266,10 +260,7 @@ public class RealmManager {
     }
   }
 
-  /**
-   * A wildcard lets any URI under it receive the authorization code, so anyone who can host content
-   * there can complete the flow. Keycloak accepts them; this does not.
-   */
+  /** A wildcard lets any URI under it receive the authorization code. Keycloak accepts them. */
   private static void assertRedirectUrisAreNotWildcards(ClientRepresentation client) {
     assertNoWildcards(client.getClientId(), "redirect URI", client.getRedirectUris());
     assertNoWildcards(client.getClientId(), "web origin", client.getWebOrigins());
@@ -588,8 +579,7 @@ public class RealmManager {
             .filter(flow -> flow.isBuiltIn() != Boolean.TRUE)
             .toList();
 
-    // Create before deleting: renaming a flow would otherwise leave a window with neither, and a
-    // realm binding pointing at the old one breaks for good if the create then fails.
+    // Create first: renaming a flow would otherwise leave a window with neither.
     flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows));
 
     Set<String> configuredAliases =

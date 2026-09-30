@@ -15,10 +15,7 @@ import java.util.stream.Stream;
 public final class Differ {
 
   /**
-   * Diffs are logged at INFO, so this covers what a diffed representation can carry verbatim. Not
-   * {@code value}: only {@link org.keycloak.representations.idm.CredentialRepresentation} has one,
-   * and credentials are left out of the diff on purpose, while a {@code value} key does occur in
-   * user-profile validator config, which is worth reading in a diff.
+   * Not {@code value}: credentials are left out of diffs, but validator config does use that key.
    */
   private static final List<String> MASKED_JSON_KEYS =
       List.of("password", "secret", "secretData", "credentialData", "privateKey");

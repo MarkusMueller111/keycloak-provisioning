@@ -26,7 +26,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         });
   }
 
-  /** The prefix scopes deletion: dropping a system client from the desired list removes it. */
   @Test
   void deletesSystemClientsThatAreNoLongerConfigured() {
     withRealmManager(
@@ -77,9 +76,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account-console").isEnabled()).isTrue();
   }
 
-  /**
-   * Reported before the first write, so a contradiction cannot leave the realm half provisioned.
-   */
   @Test
   void rejectsTheSameBuiltInClientTwice() {
     assertThatThrownBy(
@@ -100,7 +96,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account").isEnabled()).isTrue();
   }
 
-  /** Dropping an entry has to undo it, which a one-way disable could not. */
   @Test
   void reEnablesABuiltInClientThatIsNoLongerDisabled() {
     withRealmManager(
@@ -221,7 +216,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         .hasMessageContaining("no-such-scope");
   }
 
-  /** Bootstrapping one client must not put the realm's other managed clients in scope. */
   @Test
   void createsOrUpdatesASingleClientWithoutTouchingTheOthers() {
     withRealmManager(
@@ -324,7 +318,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(clientIds()).doesNotContain("unmanaged-app");
   }
 
-  /** These flags only took effect on creation before, so drift could not be provisioned away. */
   @Test
   void provisionsClientFlagsOnUpdate() {
     ClientRepresentation initial = client("system-a");
@@ -342,7 +335,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(actual.isServiceAccountsEnabled()).isFalse();
   }
 
-  /** These were settable but never diffed, so drift in them was invisible and never corrected. */
   @Test
   void revertsSecurityFlagsChangedOutOfBand() {
     ClientRepresentation declared = client("system-a");
@@ -440,7 +432,6 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         .hasMessageContaining("default");
   }
 
-  /** Declaring both is the way to opt out of one list without losing the other. */
   @Test
   void keepsTheDefaultScopesWhenBothListsAreDeclared() {
     ClientRepresentation client = client("system-a");

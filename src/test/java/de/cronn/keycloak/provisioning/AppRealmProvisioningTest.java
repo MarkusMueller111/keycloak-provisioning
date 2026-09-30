@@ -32,13 +32,11 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     assertThat(realm.isEventsEnabled()).isTrue();
     assertThat(realm.isAdminEventsEnabled()).isTrue();
     assertThat(realm.getSslRequired()).isEqualTo("external");
-    // Keycloak ships no policy at all, so without this a one-character password is accepted.
     assertThat(realm.getPasswordPolicy()).isEqualTo(PasswordPolicy.DEFAULT);
     assertThat(realm.getSsoSessionIdleTimeout()).isEqualTo(300);
     assertThat(realm.getSsoSessionMaxLifespan()).isEqualTo(3600);
   }
 
-  /** The realm is desired state too, so a realm disabled by hand has to come back. */
   @Test
   void reEnablesARealmDisabledOutOfBand() {
     provision(AppRealmConfig.builder(APP_REALM).build());

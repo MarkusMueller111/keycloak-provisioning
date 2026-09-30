@@ -132,10 +132,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(masterUser(ADMIN_USERNAME)).isNotNull();
   }
 
-  /**
-   * The production default, which no other test here exercises: provision() has to create the
-   * permanent admin before deleting the temporary ones, or the realm is left with no way back in.
-   */
+  /** The production default: create the permanent admin before deleting the temporary ones. */
   @Test
   void deletesTheTemporaryAdminsOnlyAfterCreatingThePermanentOne() {
     provision(

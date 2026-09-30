@@ -149,10 +149,7 @@ public final class AppRealmConfig {
       return this;
     }
 
-    /**
-     * Defaults to {@link PasswordPolicy#DEFAULT}; pass an empty string for Keycloak's own absence
-     * of one.
-     */
+    /** Defaults to {@link PasswordPolicy#DEFAULT}; an empty string opts out. */
     public Builder passwordPolicy(String passwordPolicy) {
       this.passwordPolicy = passwordPolicy;
       return this;

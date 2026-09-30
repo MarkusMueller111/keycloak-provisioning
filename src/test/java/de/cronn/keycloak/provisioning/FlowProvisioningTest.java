@@ -82,7 +82,6 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(this::validateCustomFlows);
   }
 
-  /** Each entry is the full desired content of its flow, so a dropped execution is removed. */
   @Test
   void doesNotKeepExecutionsThatAreNoLongerConfigured() {
     withRealmManager(
@@ -154,7 +153,6 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(executionProviderIds(FLOW)).containsExactly("auth-cookie", "auth-otp-form");
   }
 
-  /** Each entry is applied to the flow it names, independently of the others. */
   @Test
   void appliesEachEntryToTheFlowItNames() {
     withRealmManager(

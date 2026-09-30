@@ -52,9 +52,8 @@ public final class ProvisioningClientBootstrapper {
     client.setPublicClient(false);
     client.setStandardFlowEnabled(false);
     client.setDirectAccessGrantsEnabled(false);
-    // fullScopeAllowed stays at Keycloak's true on purpose: both scope lists below are empty, so
-    // without it the admin role granted to the service account never reaches the token and every
-    // provisioning call answers 403.
+    // fullScopeAllowed stays true: the scope lists below are empty, so without it the service
+    // account's admin role never reaches the token and every call answers 403.
     client.setEnabled(true);
     client.setName(provisioningClientConfig.name());
     client.setDescription(provisioningClientConfig.description());
