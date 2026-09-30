@@ -77,6 +77,27 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account-console").isEnabled()).isTrue();
   }
 
+  /** Reported before the first write, so a contradiction cannot leave the realm half reconciled. */
+  @Test
+  void rejectsTheSameBuiltInClientTwice() {
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    realmManager ->
+                        realmManager.reconcileBuiltInClients(
+                            List.of(
+                                BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
+                                    .enabled(false)
+                                    .build(),
+                                BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT)
+                                    .enabled(true)
+                                    .build()))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("account");
+
+    assertThat(findClient("account").isEnabled()).isTrue();
+  }
+
   /** Dropping an entry has to undo it, which a one-way disable could not. */
   @Test
   void reEnablesABuiltInClientThatIsNoLongerDisabled() {
