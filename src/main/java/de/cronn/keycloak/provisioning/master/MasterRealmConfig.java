@@ -46,7 +46,6 @@ public final class MasterRealmConfig {
   private final boolean bruteForceProtected;
   private final Map<SecurityHeader, String> securityHeaders;
   private final List<BuiltInClientConfig> builtInClients;
-  private final boolean disableAdminCliClient;
   private final boolean deleteTemporaryAdminUsers;
   private final Duration adminEventsExpiration;
   private final Set<String> defaultRoleComposites;
@@ -70,7 +69,6 @@ public final class MasterRealmConfig {
             ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
             : Map.copyOf(builder.securityHeaders);
     this.builtInClients = mergeOverDefaults(builder.builtInClients);
-    this.disableAdminCliClient = builder.disableAdminCliClient;
     this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
     this.adminEventsExpiration =
         builder.adminEventsExpiration == null ? Duration.ofDays(7) : builder.adminEventsExpiration;
@@ -207,13 +205,6 @@ public final class MasterRealmConfig {
   }
 
   /**
-   * @see Builder#disableAdminCliClient
-   */
-  public boolean disableAdminCliClient() {
-    return disableAdminCliClient;
-  }
-
-  /**
    * @see Builder#deleteTemporaryAdminUsers
    */
   public boolean deleteTemporaryAdminUsers() {
@@ -276,7 +267,6 @@ public final class MasterRealmConfig {
     private boolean bruteForceProtected = true;
     private Map<SecurityHeader, String> securityHeaders;
     private List<BuiltInClientConfig> builtInClients;
-    private boolean disableAdminCliClient = true;
     private boolean deleteTemporaryAdminUsers = true;
     private Duration adminEventsExpiration;
     private Set<String> defaultRoleComposites;
@@ -330,21 +320,6 @@ public final class MasterRealmConfig {
     }
 
     /**
-     * Whether {@code admin-cli} is disabled. It enables the direct access grant, i.e. a password
-     * grant that bypasses the browser flow including any 2FA configured there. Default: {@code
-     * true}.
-     *
-     * <p>Set to {@code false} when provisioning connects via {@code
-     * KeycloakAdminCliConnectionManager} and relies on {@code admin-cli} as a fallback. It is a
-     * separate option rather than part of {@link #builtInClients(java.util.List)} because that
-     * statement about the provisioning connection, not about client hardening.
-     */
-    public Builder disableAdminCliClient(boolean disableAdminCliClient) {
-      this.disableAdminCliClient = disableAdminCliClient;
-      return this;
-    }
-
-    /**
      * Whether {@link MasterRealmProvisioner#provision()} deletes the users marked {@code
      * is_temporary_admin} as its last step, after the permanent admin was created. Their
      * credentials are typically the well-known {@code KC_BOOTSTRAP_ADMIN_USERNAME}/{@code
@@ -356,9 +331,8 @@ public final class MasterRealmConfig {
      * non-compliant password fails with the misleading message {@code ERROR: Failed to start server
      * in (nonserver) mode}.
      *
-     * <p>Independent of {@link #disableAdminCliClient}: the admin console authenticates through
-     * {@code security-admin-console}, so browser login keeps working while {@code admin-cli} is
-     * disabled.
+     * <p>Independent of whether {@code admin-cli} is disabled: the admin console authenticates
+     * through {@code security-admin-console}, so browser login keeps working either way.
      */
     public Builder deleteTemporaryAdminUsers(boolean deleteTemporaryAdminUsers) {
       this.deleteTemporaryAdminUsers = deleteTemporaryAdminUsers;

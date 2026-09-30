@@ -1,15 +1,10 @@
 package de.cronn.keycloak.provisioning.master;
 
-import static de.cronn.keycloak.provisioning.KeycloakProvidedClient.ADMIN_CLI;
-
-import de.cronn.keycloak.provisioning.BuiltInClientConfig;
 import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.SecurityHeader;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -101,11 +96,7 @@ public class MasterRealmProvisioner {
   }
 
   private void reconcileBuiltInClients() {
-    List<BuiltInClientConfig> builtInClients = new ArrayList<>(config.builtInClients());
-    if (config.disableAdminCliClient()) {
-      builtInClients.add(BuiltInClientConfig.forClient(ADMIN_CLI).enabled(false).build());
-    }
-    realmManager.reconcileBuiltInClients(builtInClients);
+    realmManager.reconcileBuiltInClients(config.builtInClients());
   }
 
   /** Also covers admins created via {@code kc.sh bootstrap-admin}, which carry the same marker. */
