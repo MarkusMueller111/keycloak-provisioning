@@ -7,13 +7,14 @@ import org.keycloak.representations.idm.ClientRepresentation;
 
 /**
  * How one of Keycloak's own clients should be configured. These clients are never created or
- * deleted, only adjusted: a client without an entry is provisioned to enabled and otherwise left as
- * Keycloak made it.
+ * deleted, only adjusted: a client without an entry falls back to {@link #BUILT_IN_CLIENT_DEFAULTS}
+ * and is otherwise left as Keycloak made it.
  *
- * <p>{@link Builder#enabled(boolean)} is written on every run, so dropping an entry re-enables its
- * client. A {@link Builder#customizer(Consumer)} is applied as a delta and is <em>not</em> reverted
- * when removed — what it changed stays changed, since there is no way to know what Keycloak's value
- * for that field would have been. Set the opposite explicitly to undo one.
+ * <p>{@link Builder#enabled(boolean)} is written on every run, so dropping an entry restores that
+ * default — enabled for most, disabled for {@code broker} and {@code admin-cli}. A {@link
+ * Builder#customizer(Consumer)} is applied as a delta and is <em>not</em> reverted when removed —
+ * what it changed stays changed, since there is no way to know what Keycloak's value for that field
+ * would have been. Set the opposite explicitly to undo one.
  */
 public record BuiltInClientConfig(
     KeycloakProvidedClient client, boolean enabled, Consumer<ClientRepresentation> customizer) {

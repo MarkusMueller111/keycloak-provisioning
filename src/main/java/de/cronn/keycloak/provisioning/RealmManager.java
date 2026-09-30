@@ -152,8 +152,11 @@ public class RealmManager {
 
   /**
    * Provisions Keycloak's own clients: what {@code builtInClients} declares is applied, every other
-   * built-in is reset to enabled. Removing an entry therefore undoes it. Clients this library or a
-   * consumer provisioned are out of scope, those belong to {@link #provisionManagedClients(List)}.
+   * built-in is reset to the default in {@link BuiltInClientConfig#BUILT_IN_CLIENT_DEFAULTS}, which
+   * is not enabled for all of them. Removing an entry therefore restores that default, but does not
+   * undo what its {@link BuiltInClientConfig.Builder#customizer customizer} changed. Clients this
+   * library or a consumer provisioned are out of scope, those belong to {@link
+   * #provisionManagedClients(List)}.
    */
   public void provisionBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
     Map<KeycloakProvidedClient, BuiltInClientConfig> byClient = new LinkedHashMap<>();
