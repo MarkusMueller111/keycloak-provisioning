@@ -20,6 +20,7 @@ public final class AppRealmConfig {
   private final String realmName;
   private final String displayName;
   private final SslRequired sslRequired;
+  private final String passwordPolicy;
   private final boolean bruteForceProtected;
   private final boolean eventsEnabled;
   private final Duration eventsExpiration;
@@ -35,13 +36,17 @@ public final class AppRealmConfig {
     this.realmName = Validate.notBlank(builder.realmName);
     this.displayName = builder.displayName == null ? builder.realmName : builder.displayName;
     this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
+    this.passwordPolicy =
+        builder.passwordPolicy == null ? PasswordPolicy.DEFAULT : builder.passwordPolicy;
     this.bruteForceProtected = builder.bruteForceProtected;
     this.eventsEnabled = builder.eventsEnabled;
     this.eventsExpiration = builder.eventsExpiration;
     this.adminEventsEnabled = builder.adminEventsEnabled;
     this.adminEventsExpiration = builder.adminEventsExpiration;
-    this.sessionIdleTimeout = builder.sessionIdleTimeout;
-    this.sessionMaxLifespan = builder.sessionMaxLifespan;
+    this.sessionIdleTimeout =
+        builder.sessionIdleTimeout == null ? Duration.ofMinutes(5) : builder.sessionIdleTimeout;
+    this.sessionMaxLifespan =
+        builder.sessionMaxLifespan == null ? Duration.ofHours(1) : builder.sessionMaxLifespan;
     this.accessTokenLifespan = builder.accessTokenLifespan;
     this.securityHeaders =
         builder.securityHeaders == null
@@ -64,6 +69,10 @@ public final class AppRealmConfig {
 
   public SslRequired sslRequired() {
     return sslRequired;
+  }
+
+  public String passwordPolicy() {
+    return passwordPolicy;
   }
 
   public boolean bruteForceProtected() {
@@ -113,6 +122,7 @@ public final class AppRealmConfig {
     private final String realmName;
     private String displayName;
     private SslRequired sslRequired;
+    private String passwordPolicy;
     private boolean bruteForceProtected = true;
     private boolean eventsEnabled = true;
     private Duration eventsExpiration;
@@ -136,6 +146,15 @@ public final class AppRealmConfig {
 
     public Builder sslRequired(SslRequired sslRequired) {
       this.sslRequired = sslRequired;
+      return this;
+    }
+
+    /**
+     * Defaults to {@link PasswordPolicy#DEFAULT}; pass an empty string for Keycloak's own absence
+     * of one.
+     */
+    public Builder passwordPolicy(String passwordPolicy) {
+      this.passwordPolicy = passwordPolicy;
       return this;
     }
 

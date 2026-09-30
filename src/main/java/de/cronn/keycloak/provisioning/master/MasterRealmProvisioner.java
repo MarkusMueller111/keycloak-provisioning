@@ -74,11 +74,11 @@ public class MasterRealmProvisioner {
         "adminEventsExpiration",
         String.valueOf(config.adminEventsExpiration().toSeconds()));
 
+    realmRepresentation.setEnabled(true);
     realmRepresentation.setAdminEventsEnabled(true);
     realmRepresentation.setEventsEnabled(true);
     realmRepresentation.setBruteForceProtected(config.bruteForceProtected());
     realmRepresentation.setSslRequired(config.sslRequired().getKeycloakValue());
-    realmRepresentation.setRevokeRefreshToken(false);
     realmRepresentation.setPasswordPolicy(config.passwordPolicy());
     realmRepresentation.setSsoSessionIdleTimeout(
         Math.toIntExact(config.sessionIdleTimeout().toSeconds()));

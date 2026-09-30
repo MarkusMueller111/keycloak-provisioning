@@ -46,7 +46,9 @@ public class AppRealmProvisioner {
   }
 
   private void configureRealm(RealmRepresentation realm) {
+    realm.setEnabled(true);
     realm.setDisplayName(config.displayName());
+    realm.setPasswordPolicy(config.passwordPolicy());
     realm.setSslRequired(config.sslRequired().getKeycloakValue());
     realm.setBruteForceProtected(config.bruteForceProtected());
     realm.setEventsEnabled(config.eventsEnabled());
@@ -62,12 +64,8 @@ public class AppRealmProvisioner {
           "adminEventsExpiration",
           String.valueOf(config.adminEventsExpiration().toSeconds()));
     }
-    if (config.sessionIdleTimeout() != null) {
-      realm.setSsoSessionIdleTimeout(toSecondsInt(config.sessionIdleTimeout()));
-    }
-    if (config.sessionMaxLifespan() != null) {
-      realm.setSsoSessionMaxLifespan(toSecondsInt(config.sessionMaxLifespan()));
-    }
+    realm.setSsoSessionIdleTimeout(toSecondsInt(config.sessionIdleTimeout()));
+    realm.setSsoSessionMaxLifespan(toSecondsInt(config.sessionMaxLifespan()));
     if (config.accessTokenLifespan() != null) {
       realm.setAccessTokenLifespan(toSecondsInt(config.accessTokenLifespan()));
     }
