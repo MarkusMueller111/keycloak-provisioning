@@ -89,6 +89,8 @@ differently depending on where it is sent:
   `introspection.token.claim` and `userinfo.token.claim` from `access.token.claim` and
   `id.token.claim`.
 - A client created without web origins gets them derived from its redirect URIs.
+- A user's reset-password endpoint ignores the credential type and stores any value as the
+  password. The `passwordHistory` and `passwordAge` policies reject a reset to the current password.
 
 ## Tests
 

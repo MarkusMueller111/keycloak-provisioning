@@ -7,11 +7,20 @@ import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.keycloak.OAuth2Constants;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
 class UserProvisioningTest extends SharedKeycloakTest {
+
+  private static final String PASSWORD = "Str0ng-P4ssw0rd!";
+  private static final String LOGIN_CLIENT = "login";
 
   @Test
   void createsTheConfiguredUsers() {
@@ -95,21 +104,70 @@ class UserProvisioningTest extends SharedKeycloakTest {
                 "PUT /admin/realms/test/users/<id>/reset-password"));
   }
 
-  /** Keycloak never returns a credential value, so it is applied rather than diffed. */
   @Test
   void setsAPasswordThatCanBeUsedToLogIn() {
-    UserRepresentation alice = user("alice");
-    alice.setCredentials(List.of(password("Str0ng-P4ssw0rd!")));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(alice)));
-
-    assertThat(credentialTypes("alice")).contains(CredentialRepresentation.PASSWORD);
+    assertThat(logIn("alice", PASSWORD)).isNotBlank();
   }
 
-  /**
-   * Keycloak lower-cases the stored name, so provisioning would compare the configured spelling
-   * against it, take the user for unmanaged and delete the account it had just created.
-   */
+  @Test
+  void setsANewUsersPasswordOnlyThroughItsCreation() {
+    withTestUserProvisioner(
+        p ->
+            assertSendsOnlyWrites(
+                () -> p.provisionUsers(List.of(userWithPassword("alice"))),
+                "POST /admin/realms/test/users"));
+  }
+
+  @Test
+  void restoresAPasswordChangedOutOfBand() {
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+    adminClient()
+        .realm(REALM)
+        .users()
+        .get(findUser("alice").getId())
+        .resetPassword(password("Ch4nged-P4ssw0rd!"));
+
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+
+    assertThat(logIn("alice", PASSWORD)).isNotBlank();
+  }
+
+  /** Both reject a password reset to the current value, so a rerun could never re-apply it. */
+  @ParameterizedTest
+  @ValueSource(strings = {"passwordHistory(3)", "passwordAge(1)"})
+  void rejectsPasswordsUnderAPolicyThatForbidsReusingThem(String policy) {
+    RealmRepresentation realm = adminClient().realm(REALM).toRepresentation();
+    realm.setPasswordPolicy("length(8) and " + policy);
+    adminClient().realm(REALM).update(realm);
+
+    assertThatThrownBy(
+            () ->
+                withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice")))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining(policy.substring(0, policy.indexOf('(')));
+    assertThat(usernames()).doesNotContain("alice");
+
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("bob"))));
+    assertThat(usernames()).contains("bob");
+  }
+
+  /** Keycloak's reset-password endpoint ignores the type and stores any value as the password. */
+  @Test
+  void rejectsCredentialsOtherThanPasswords() {
+    UserRepresentation withOtp = user("alice");
+    CredentialRepresentation otp = new CredentialRepresentation();
+    otp.setType(CredentialRepresentation.TOTP);
+    otp.setValue("123456");
+    withOtp.setCredentials(List.of(otp));
+
+    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withOtp))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("otp");
+    assertThat(usernames()).doesNotContain("alice");
+  }
+
   @Test
   void rejectsAMixedCaseUsername() {
     assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(user("Alice")))))
@@ -179,10 +237,34 @@ class UserProvisioningTest extends SharedKeycloakTest {
     return user;
   }
 
+  /** The default user profile requires both names before a user can log in. */
   private static UserRepresentation userWithPassword(String username) {
     UserRepresentation user = user(username);
-    user.setCredentials(List.of(password("Str0ng-P4ssw0rd!")));
+    user.setFirstName("First");
+    user.setLastName("Last");
+    user.setCredentials(List.of(password(PASSWORD)));
     return user;
+  }
+
+  private String logIn(String username, String password) {
+    if (adminClient().realm(REALM).clients().findByClientId(LOGIN_CLIENT).isEmpty()) {
+      ClientRepresentation client = new ClientRepresentation();
+      client.setClientId(LOGIN_CLIENT);
+      client.setPublicClient(true);
+      client.setDirectAccessGrantsEnabled(true);
+      adminClient().realm(REALM).clients().create(client).close();
+    }
+    try (Keycloak keycloak =
+        KeycloakBuilder.builder()
+            .serverUrl(serverUrl())
+            .realm(REALM)
+            .grantType(OAuth2Constants.PASSWORD)
+            .clientId(LOGIN_CLIENT)
+            .username(username)
+            .password(password)
+            .build()) {
+      return keycloak.tokenManager().getAccessTokenString();
+    }
   }
 
   private static CredentialRepresentation password(String value) {
@@ -201,11 +283,5 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
   private UserRepresentation findUser(String username) {
     return adminClient().realm(REALM).users().searchByUsername(username, true).getFirst();
-  }
-
-  private List<String> credentialTypes(String username) {
-    return adminClient().realm(REALM).users().get(findUser(username).getId()).credentials().stream()
-        .map(CredentialRepresentation::getType)
-        .toList();
   }
 }
