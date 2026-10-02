@@ -1,5 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakDefaultConnectionConfig;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
@@ -68,6 +70,24 @@ abstract class KeycloakContainerSupport implements KeycloakTestTraits {
   }
 
   protected abstract Keycloak adminClient();
+
+  protected static void assertSendsNoWrites(Runnable action) {
+    assertSendsOnlyWrites(action);
+  }
+
+  /**
+   * {@code expectedWrites} as {@code METHOD /path}, with every id as {@code <id>}. Open the
+   * connection before calling this, so bootstrapping the provisioning client is not counted against
+   * {@code action}.
+   */
+  protected static void assertSendsOnlyWrites(Runnable action, String... expectedWrites) {
+    try (KeycloakWriteRecorder recorder = new KeycloakWriteRecorder()) {
+      action.run();
+      assertThat(recorder.writes())
+          .as("writes sent to Keycloak")
+          .containsExactlyInAnyOrder(expectedWrites);
+    }
+  }
 
   protected DefaultKeycloakConnectionManager connectionManager() {
     return new DefaultKeycloakConnectionManager(

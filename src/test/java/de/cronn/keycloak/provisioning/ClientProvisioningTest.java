@@ -487,6 +487,47 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(mapperNames("system-a")).isEmpty();
   }
 
+  @Test
+  void updatesTheClientAgainWhenRerunUnchanged() {
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    withRealmManager(
+        rm ->
+            assertSendsOnlyWrites(
+                () -> rm.provisionManagedClients(List.of(client("system-a"))),
+                "PUT /admin/realms/test/clients/<id>"));
+  }
+
+  @Test
+  void updatesTheClientAndItsMapperAgainWhenRerunUnchanged() {
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers())));
+
+    withRealmManager(
+        rm ->
+            assertSendsOnlyWrites(
+                () -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers())),
+                "PUT /admin/realms/test/clients/<id>",
+                "PUT /admin/realms/test/clients/<id>/protocol-mappers/models/<id>"));
+  }
+
+  @Test
+  void sendsNoWritesWhenBuiltInClientsAreRerunUnchanged() {
+    List<BuiltInClientConfig> builtInClients =
+        List.of(
+            BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT).enabled(false).build());
+    withRealmManager(rm -> rm.provisionBuiltInClients(builtInClients));
+
+    withRealmManager(rm -> assertSendsNoWrites(() -> rm.provisionBuiltInClients(builtInClients)));
+  }
+
+  private static ClientRepresentation clientWithScopesAndMappers() {
+    ClientRepresentation client = client("system-a");
+    client.setDefaultClientScopes(List.of("profile", "email"));
+    client.setOptionalClientScopes(List.of());
+    client.setProtocolMappers(List.of(hardcodedClaim("kept", "one")));
+    return client;
+  }
+
   private static ProtocolMapperRepresentation hardcodedClaim(String name, String value) {
     ProtocolMapperRepresentation mapper = new ProtocolMapperRepresentation();
     mapper.setName(name);

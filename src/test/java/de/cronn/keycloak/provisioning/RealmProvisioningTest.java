@@ -50,18 +50,13 @@ class RealmProvisioningTest extends SharedKeycloakTest {
     assertThat(findRealm().getDisplayName()).isEqualTo("Renamed");
   }
 
-  /**
-   * The common case when provisioning runs on every start: nothing changed, so nothing is written.
-   */
   @Test
-  void leavesAnUnchangedRealmAlone() {
+  void sendsNoWritesWhenRerunUnchanged() {
     Consumer<RealmRepresentation> customizer = realm -> realm.setDisplayName("Stable");
     withNewRealmManager(realmManager -> realmManager.createOrUpdateRealm(customizer));
-    String versionBefore = String.valueOf(findRealm().getDisplayName());
 
-    withNewRealmManager(realmManager -> realmManager.createOrUpdateRealm(customizer));
-
-    assertThat(findRealm().getDisplayName()).isEqualTo(versionBefore);
+    withNewRealmManager(
+        realmManager -> assertSendsNoWrites(() -> realmManager.createOrUpdateRealm(customizer)));
   }
 
   @Test
