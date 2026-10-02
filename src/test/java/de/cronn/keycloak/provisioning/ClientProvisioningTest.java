@@ -1,8 +1,12 @@
 package de.cronn.keycloak.provisioning;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Change.Type;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakDefaultConnectionConfig;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentialsConfig;
@@ -10,6 +14,7 @@ import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClie
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.resource.ClientResource;
 import org.keycloak.representations.idm.ClientRepresentation;
@@ -58,7 +63,15 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
           ClientRepresentation renamed = client("system-a");
           renamed.setName("renamed");
-          realmManager.provisionManagedClients(List.of(renamed));
+          ProvisioningResult result = realmManager.provisionManagedClients(List.of(renamed));
+
+          assertThat(result.changes())
+              .singleElement()
+              .returns(Target.CLIENT, Change::target)
+              .returns("system-a", Change::name)
+              .returns(Type.UPDATED, Change::type)
+              .extracting(Change::diff, as(InstanceOfAssertFactories.STRING))
+              .contains("\"renamed\"");
         });
 
     assertThat(findClient("system-a").getName()).isEqualTo("renamed");
@@ -456,7 +469,13 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
     ClientRepresentation changed = client("system-a");
     changed.setProtocolMappers(List.of(hardcodedClaim("kept", "two")));
-    withRealmManager(rm -> rm.provisionManagedClients(List.of(changed)));
+    withRealmManager(
+        rm ->
+            assertThat(rm.provisionManagedClients(List.of(changed)).changes())
+                .extracting(Change::target, Change::name, Change::parent, Change::type)
+                .containsExactlyInAnyOrder(
+                    tuple(Target.PROTOCOL_MAPPER, "dropped", "system-a", Type.REMOVED),
+                    tuple(Target.PROTOCOL_MAPPER, "kept", "system-a", Type.UPDATED)));
 
     assertThat(mapperNames("system-a")).containsExactly("kept");
     assertThat(mapperConfig("system-a", "kept")).containsEntry("claim.value", "two");
@@ -515,7 +534,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(actual.getAttributes()).doesNotContainKey("pkce.code.challenge.method");
     assertThat(actual.getAuthenticationFlowBindingOverrides()).isEmpty();
     withRealmManager(
-        rm -> assertSendsNoWrites(() -> rm.provisionManagedClients(List.of(client("system-a")))));
+        rm -> assertChangesNothing(() -> rm.provisionManagedClients(List.of(client("system-a")))));
   }
 
   @Test
@@ -523,7 +542,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
 
     withRealmManager(
-        rm -> assertSendsNoWrites(() -> rm.provisionManagedClients(List.of(client("system-a")))));
+        rm -> assertChangesNothing(() -> rm.provisionManagedClients(List.of(client("system-a")))));
   }
 
   @Test
@@ -532,7 +551,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
     withRealmManager(
         rm ->
-            assertSendsNoWrites(
+            assertChangesNothing(
                 () -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers()))));
   }
 
@@ -543,7 +562,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     bare.setClientId("unmanaged-app");
     withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(bare));
 
-    withRealmManager(rm -> assertSendsNoWrites(() -> rm.createOrUpdateUnmanagedClient(bare)));
+    withRealmManager(rm -> assertChangesNothing(() -> rm.createOrUpdateUnmanagedClient(bare)));
   }
 
   @Test
@@ -553,7 +572,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
             BuiltInClientConfig.forClient(KeycloakProvidedClient.ACCOUNT).enabled(false).build());
     withRealmManager(rm -> rm.provisionBuiltInClients(builtInClients));
 
-    withRealmManager(rm -> assertSendsNoWrites(() -> rm.provisionBuiltInClients(builtInClients)));
+    withRealmManager(rm -> assertChangesNothing(() -> rm.provisionBuiltInClients(builtInClients)));
   }
 
   private static ClientRepresentation clientWithScopesAndMappers() {

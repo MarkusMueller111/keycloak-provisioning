@@ -1,6 +1,9 @@
 package de.cronn.keycloak.provisioning.testsupport;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Changes;
 import de.cronn.keycloak.provisioning.KeycloakException;
+import de.cronn.keycloak.provisioning.ProvisioningResult;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.Usernames;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
@@ -50,7 +53,7 @@ public final class TestUserProvisioner {
    *
    * <p>Usernames have to be lower-case — see {@link Usernames#requireLowerCase(String)}.
    */
-  public void provisionUsers(List<UserRepresentation> users) {
+  public ProvisioningResult provisionUsers(List<UserRepresentation> users) {
     users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
     users.forEach(TestUserProvisioner::assertNoMembershipsAreDeclared);
     users.forEach(TestUserProvisioner::assertOnlyPasswordsAreDeclared);
@@ -64,10 +67,11 @@ public final class TestUserProvisioner {
             .flatMap(realmManager::searchUsersByExactUsername)
             .toList();
 
+    Changes changes = new Changes(log, realmManager.getRealmName());
     UserRepresentationDiffer differ = new UserRepresentationDiffer(existingUsers, users);
     // A new user gets its password from the create request.
-    differ.getElementsToAdd().forEach(this::addUser);
-    differ.getElementsToUpdate().forEach(this::updateUser);
+    differ.getElementsToAdd().forEach(user -> addUser(user, changes));
+    differ.getElementsToUpdate().forEach(update -> updateUser(update, changes));
 
     Set<String> createdUsernames =
         differ.getElementsToAdd().stream()
@@ -75,8 +79,9 @@ public final class TestUserProvisioner {
             .collect(Collectors.toSet());
     users.stream()
         .filter(user -> !createdUsernames.contains(user.getUsername()))
-        .forEach(this::applyCredentials);
-    removeUsersNotIn(users);
+        .forEach(user -> applyCredentials(user, changes));
+    removeUsersNotIn(users, changes);
+    return changes.result();
   }
 
   private static boolean declaresCredentials(UserRepresentation user) {
@@ -144,7 +149,7 @@ public final class TestUserProvisioner {
    * Service account users are safe from this: Keycloak leaves them out of the user listing it
    * walks, so the connection's own service account cannot be deleted out from under it.
    */
-  private void removeUsersNotIn(List<UserRepresentation> users) {
+  private void removeUsersNotIn(List<UserRepresentation> users, Changes changes) {
     Set<String> keptUsernames =
         users.stream().map(UserRepresentation::getUsername).collect(Collectors.toSet());
 
@@ -152,26 +157,23 @@ public final class TestUserProvisioner {
         .filter(user -> !keptUsernames.contains(user.getUsername()))
         .forEach(
             user -> {
-              log.info("Deleting unmanaged user '{}'", user.getUsername());
+              changes.removed(Target.USER, user.getUsername());
               realmManager.deleteUser(user.getId());
             });
   }
 
-  private void addUser(UserRepresentation user) {
-    log.info("Creating user '{}'", user.getUsername());
+  private void addUser(UserRepresentation user, Changes changes) {
+    changes.added(Target.USER, user.getUsername());
     realmManager.createUser(user);
   }
 
-  private void updateUser(ToUpdate<UserRepresentation> update) {
+  private void updateUser(ToUpdate<UserRepresentation> update, Changes changes) {
     UserRepresentation newUser = update.newState();
-    log.info(
-        "User '{}' already exists, but update is required:\n{}",
-        newUser.getUsername(),
-        update.multiLineDiff());
+    changes.updated(Target.USER, newUser.getUsername(), update.multiLineDiff());
     realmManager.getUserResource(newUser.getId()).update(newUser);
   }
 
-  private void applyCredentials(UserRepresentation desiredUser) {
+  private void applyCredentials(UserRepresentation desiredUser, Changes changes) {
     List<CredentialRepresentation> credentials = desiredUser.getCredentials();
     if (credentials == null || credentials.isEmpty()) {
       return;
@@ -182,10 +184,7 @@ public final class TestUserProvisioner {
             userResource ->
                 credentials.forEach(
                     credential -> {
-                      log.info(
-                          "Setting {} credential for user '{}'",
-                          credential.getType(),
-                          desiredUser.getUsername());
+                      changes.updated(Target.PASSWORD, desiredUser.getUsername(), null);
                       userResource.resetPassword(credential);
                     }));
   }

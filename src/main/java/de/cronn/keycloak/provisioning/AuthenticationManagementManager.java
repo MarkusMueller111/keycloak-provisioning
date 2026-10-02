@@ -1,5 +1,8 @@
 package de.cronn.keycloak.provisioning;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
+import de.cronn.keycloak.provisioning.differ.Differ;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,34 +29,38 @@ public class AuthenticationManagementManager {
     this.realm = Objects.requireNonNull(realm);
   }
 
-  public void configure(AuthenticationManagementConfig config) {
+  public ProvisioningResult configure(AuthenticationManagementConfig config) {
     AuthenticationManagementResource authentication = realm.flows();
 
     List<AuthenticationManagementConfig.RequiredAction> requiredActions = config.requiredActions();
-    if (!requiredActions.isEmpty()) {
-      registerUnregisteredActions(authentication, requiredActions);
-
-      Map<String, RequiredActionProviderRepresentation> existingByProviderId =
-          authentication.getRequiredActions().stream()
-              .collect(
-                  Collectors.toMap(RequiredActionProviderRepresentation::getProviderId, r -> r));
-
-      int priority = 10;
-      for (AuthenticationManagementConfig.RequiredAction requiredAction : requiredActions) {
-        upsertRequiredAction(authentication, requiredAction, priority);
-        priority += 10;
-        existingByProviderId.remove(requiredAction.providerId());
-      }
-
-      for (RequiredActionProviderRepresentation unmanaged : existingByProviderId.values()) {
-        removeRegisteredAction(authentication, unmanaged);
-      }
+    if (requiredActions.isEmpty()) {
+      return ProvisioningResult.none();
     }
+    Changes changes = new Changes(log, realm.toRepresentation().getRealm());
+    registerUnregisteredActions(authentication, requiredActions, changes);
+
+    Map<String, RequiredActionProviderRepresentation> existingByProviderId =
+        authentication.getRequiredActions().stream()
+            .collect(Collectors.toMap(RequiredActionProviderRepresentation::getProviderId, r -> r));
+
+    int priority = 10;
+    for (AuthenticationManagementConfig.RequiredAction requiredAction : requiredActions) {
+      updateRequiredActionIfChanged(authentication, requiredAction, priority, changes);
+      priority += 10;
+      existingByProviderId.remove(requiredAction.providerId());
+    }
+
+    for (RequiredActionProviderRepresentation unmanaged : existingByProviderId.values()) {
+      changes.removed(Target.REQUIRED_ACTION, unmanaged.getAlias());
+      authentication.removeRequiredAction(unmanaged.getAlias());
+    }
+    return changes.result();
   }
 
   private void registerUnregisteredActions(
       AuthenticationManagementResource authentication,
-      List<AuthenticationManagementConfig.RequiredAction> requiredActions) {
+      List<AuthenticationManagementConfig.RequiredAction> requiredActions,
+      Changes changes) {
     Map<String, RequiredActionProviderSimpleRepresentation> unregistered =
         authentication.getUnregisteredRequiredActions().stream()
             .collect(
@@ -64,37 +71,33 @@ public class AuthenticationManagementManager {
       RequiredActionProviderSimpleRepresentation toRegister =
           unregistered.get(requiredAction.providerId());
       if (toRegister != null) {
-        log.info("Registering required action provider '{}'", requiredAction.providerId());
+        changes.added(Target.REQUIRED_ACTION, requiredAction.providerId());
         authentication.registerRequiredAction(toRegister);
       }
     }
   }
 
-  private void upsertRequiredAction(
+  private void updateRequiredActionIfChanged(
       AuthenticationManagementResource authentication,
       AuthenticationManagementConfig.RequiredAction requiredAction,
-      int priority) {
+      int priority,
+      Changes changes) {
     RequiredActionProviderRepresentation representation =
         authentication.getRequiredAction(requiredAction.providerId());
+    String before = AbstractDiffer.toJson(representation);
     representation.setName(requiredAction.displayName());
     representation.setEnabled(requiredAction.enabled());
     representation.setDefaultAction(requiredAction.defaultAction());
     representation.setPriority(priority);
+    String after = AbstractDiffer.toJson(representation);
+    if (before.equals(after)) {
+      return;
+    }
 
-    log.info(
-        "Configuring required action '{}' (enabled={}, defaultAction={}, priority={})",
+    changes.updated(
+        Target.REQUIRED_ACTION,
         requiredAction.providerId(),
-        requiredAction.enabled(),
-        requiredAction.defaultAction(),
-        priority);
+        Differ.calculateMultilineDiff(before, after));
     authentication.updateRequiredAction(requiredAction.providerId(), representation);
-  }
-
-  private void removeRegisteredAction(
-      AuthenticationManagementResource authentication,
-      RequiredActionProviderRepresentation action) {
-
-    log.info("Removing required action '{}'", action.getAlias());
-    authentication.removeRequiredAction(action.getAlias());
   }
 }

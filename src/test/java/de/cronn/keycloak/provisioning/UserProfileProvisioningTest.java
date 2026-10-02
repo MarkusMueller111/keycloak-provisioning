@@ -59,7 +59,7 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
     withRealmManager(realmManager -> realmManager.provisionUserProfile(config));
 
     withRealmManager(
-        realmManager -> assertSendsNoWrites(() -> realmManager.provisionUserProfile(config)));
+        realmManager -> assertChangesNothing(() -> realmManager.provisionUserProfile(config)));
   }
 
   private void removeAttributeDirectly(String attributeName) {

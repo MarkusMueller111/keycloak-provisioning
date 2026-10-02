@@ -1,7 +1,10 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Change.Type;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import java.util.List;
 import java.util.function.Consumer;
@@ -45,7 +48,13 @@ class RealmProvisioningTest extends SharedKeycloakTest {
     withNewRealmManager(realmManager -> realmManager.createOrUpdateRealm(realm -> {}));
 
     withNewRealmManager(
-        realmManager -> realmManager.createOrUpdateRealm(realm -> realm.setDisplayName("Renamed")));
+        realmManager ->
+            assertThat(
+                    realmManager
+                        .createOrUpdateRealm(realm -> realm.setDisplayName("Renamed"))
+                        .changes())
+                .extracting(Change::target, Change::name, Change::type)
+                .containsExactly(tuple(Target.REALM, NEW_REALM, Type.UPDATED)));
 
     assertThat(findRealm().getDisplayName()).isEqualTo("Renamed");
   }
@@ -56,7 +65,7 @@ class RealmProvisioningTest extends SharedKeycloakTest {
     withNewRealmManager(realmManager -> realmManager.createOrUpdateRealm(customizer));
 
     withNewRealmManager(
-        realmManager -> assertSendsNoWrites(() -> realmManager.createOrUpdateRealm(customizer)));
+        realmManager -> assertChangesNothing(() -> realmManager.createOrUpdateRealm(customizer)));
   }
 
   @Test
