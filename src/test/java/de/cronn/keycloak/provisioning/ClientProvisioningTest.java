@@ -488,26 +488,62 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void updatesTheClientAgainWhenRerunUnchanged() {
+  void restoresKeycloaksDefaultsWhenDeclarationsAreRemoved() {
+    String browserFlowId =
+        adminClient().realm(REALM).flows().getFlows().stream()
+            .filter(flow -> "browser".equals(flow.getAlias()))
+            .findFirst()
+            .orElseThrow()
+            .getId();
+    ClientRepresentation declared = client("system-a");
+    declared.setDescription("described");
+    declared.setRootUrl("https://app.example.com");
+    declared.setStandardFlowEnabled(false);
+    declared.setRedirectUris(List.of("https://app.example.com/callback"));
+    declared.setAttributes(Map.of("pkce.code.challenge.method", "S256"));
+    declared.setAuthenticationFlowBindingOverrides(Map.of("browser", browserFlowId));
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(declared)));
+
     withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
 
+    ClientRepresentation actual = findClient("system-a");
+    assertThat(actual.getDescription()).isNullOrEmpty();
+    assertThat(actual.getRootUrl()).isNullOrEmpty();
+    assertThat(actual.isStandardFlowEnabled()).isTrue();
+    assertThat(actual.getRedirectUris()).isEmpty();
+    assertThat(actual.getWebOrigins()).isEmpty();
+    assertThat(actual.getAttributes()).doesNotContainKey("pkce.code.challenge.method");
+    assertThat(actual.getAuthenticationFlowBindingOverrides()).isEmpty();
     withRealmManager(
-        rm ->
-            assertSendsOnlyWrites(
-                () -> rm.provisionManagedClients(List.of(client("system-a"))),
-                "PUT /admin/realms/test/clients/<id>"));
+        rm -> assertSendsNoWrites(() -> rm.provisionManagedClients(List.of(client("system-a")))));
   }
 
   @Test
-  void updatesTheClientAndItsMapperAgainWhenRerunUnchanged() {
+  void sendsNoWritesWhenRerunUnchanged() {
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    withRealmManager(
+        rm -> assertSendsNoWrites(() -> rm.provisionManagedClients(List.of(client("system-a")))));
+  }
+
+  @Test
+  void sendsNoWritesWhenAClientWithScopesAndMappersIsRerunUnchanged() {
     withRealmManager(rm -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers())));
 
     withRealmManager(
         rm ->
-            assertSendsOnlyWrites(
-                () -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers())),
-                "PUT /admin/realms/test/clients/<id>",
-                "PUT /admin/realms/test/clients/<id>/protocol-mappers/models/<id>"));
+            assertSendsNoWrites(
+                () -> rm.provisionManagedClients(List.of(clientWithScopesAndMappers()))));
+  }
+
+  /** Unlike a managed client, this path adds no defaults of its own before creating it. */
+  @Test
+  void sendsNoWritesWhenAnUnmanagedClientDeclaringNothingIsRerun() {
+    ClientRepresentation bare = new ClientRepresentation();
+    bare.setClientId("unmanaged-app");
+    withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(bare));
+
+    withRealmManager(rm -> assertSendsNoWrites(() -> rm.createOrUpdateUnmanagedClient(bare)));
   }
 
   @Test
@@ -524,7 +560,13 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     ClientRepresentation client = client("system-a");
     client.setDefaultClientScopes(List.of("profile", "email"));
     client.setOptionalClientScopes(List.of());
-    client.setProtocolMappers(List.of(hardcodedClaim("kept", "one")));
+    client.setProtocolMappers(
+        List.of(
+            hardcodedClaim("kept", "one"),
+            idTokenClaim("in-id-token", "true"),
+            idTokenClaim("not-in-id-token", "false")));
+    client.setRedirectUris(
+        List.of("https://app.example.com/callback", "https://app.example.com:8443/callback"));
     return client;
   }
 
@@ -539,6 +581,16 @@ class ClientProvisioningTest extends SharedKeycloakTest {
                 "claim.name", name,
                 "claim.value", value,
                 "access.token.claim", "true")));
+    return mapper;
+  }
+
+  private static ProtocolMapperRepresentation idTokenClaim(String name, String idTokenClaim) {
+    ProtocolMapperRepresentation mapper = new ProtocolMapperRepresentation();
+    mapper.setName(name);
+    mapper.setProtocol("openid-connect");
+    mapper.setProtocolMapper("oidc-hardcoded-claim-mapper");
+    mapper.setConfig(
+        Map.of("claim.name", name, "claim.value", "x", "id.token.claim", idTokenClaim));
     return mapper;
   }
 

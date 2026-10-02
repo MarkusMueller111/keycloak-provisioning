@@ -50,7 +50,7 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void updatesTheUserProfileAgainWhenRerunUnchanged() {
+  void sendsNoWritesWhenRerunUnchanged() {
     UserProfileConfig config =
         UserProfileConfig.builder()
             .attributes(List.of(UserProfileConfig.AttributeConfig.builder("department").build()))
@@ -59,10 +59,7 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
     withRealmManager(realmManager -> realmManager.provisionUserProfile(config));
 
     withRealmManager(
-        realmManager ->
-            assertSendsOnlyWrites(
-                () -> realmManager.provisionUserProfile(config),
-                "PUT /admin/realms/test/users/profile"));
+        realmManager -> assertSendsNoWrites(() -> realmManager.provisionUserProfile(config)));
   }
 
   private void removeAttributeDirectly(String attributeName) {

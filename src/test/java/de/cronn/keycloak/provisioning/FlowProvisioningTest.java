@@ -260,14 +260,11 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void updatesTheFlowAgainWhenRerunUnchanged() {
+  void sendsNoWritesWhenRerunUnchanged() {
     withRealmManager(this::provisionFlowWithExecutions);
 
     withRealmManager(
-        realmManager ->
-            assertSendsOnlyWrites(
-                () -> provisionFlowWithExecutions(realmManager),
-                "PUT /admin/realms/test/authentication/flows/<id>"));
+        realmManager -> assertSendsNoWrites(() -> provisionFlowWithExecutions(realmManager)));
   }
 
   private void provisionFlowWithExecutions(RealmManager realmManager) {

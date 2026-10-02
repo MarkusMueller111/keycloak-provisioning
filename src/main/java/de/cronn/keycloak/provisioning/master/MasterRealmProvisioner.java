@@ -4,13 +4,13 @@ import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.SecurityHeader;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
+import de.cronn.keycloak.provisioning.differ.Declared;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
@@ -65,9 +65,12 @@ public class MasterRealmProvisioner {
   }
 
   private void configureRealm() {
-    RealmResource realm = realmManager.getRealmResource();
-    RealmRepresentation realmRepresentation = realm.toRepresentation();
+    realmManager.createOrUpdateRealm(this::configureRealm);
+    // A changed frontend URL changes the token issuer, which the current token no longer matches.
+    realmManager.refreshToken();
+  }
 
+  private void configureRealm(RealmRepresentation realmRepresentation) {
     setAttribute(realmRepresentation, "frontendUrl", config.frontendUrl());
     setAttribute(
         realmRepresentation,
@@ -86,14 +89,13 @@ public class MasterRealmProvisioner {
         Math.toIntExact(config.sessionMaxLifespan().toSeconds()));
     SecurityHeader.applyTo(realmRepresentation, config.securityHeaders());
 
-    if (config.smtp() != null) {
-      realmRepresentation.setSmtpServer(mapSmtpServer(config.smtp()));
-    }
+    realmRepresentation.setSmtpServer(
+        Declared.orDefault(
+            config.smtp() == null ? null : mapSmtpServer(config.smtp()),
+            realmRepresentation.getSmtpServer(),
+            Map.of()));
 
     config.realmCustomizer().accept(realmRepresentation);
-
-    realm.update(realmRepresentation);
-    realmManager.refreshToken();
   }
 
   private void provisionBuiltInClients() {

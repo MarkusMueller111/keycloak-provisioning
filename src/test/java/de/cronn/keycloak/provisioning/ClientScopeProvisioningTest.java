@@ -6,6 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.keycloak.OAuth2Constants;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 
@@ -59,27 +63,42 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
     assertThat(mapperNames("system-a")).containsExactly("kept");
   }
 
+  /** Keycloak cannot remove a scope attribute, so this pins the value standing in for absent. */
   @Test
-  void updatesTheScopeAndItsMapperAgainWhenRerunUnchanged() {
-    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())));
-
+  void restoresTheTokenScopeClaimWhenIncludeInTokenScopeIsNoLongerDeclared() {
     withRealmManager(
-        rm ->
-            assertSendsOnlyWrites(
-                () -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())),
-                "PUT /admin/realms/test/client-scopes/<id>",
-                "PUT /admin/realms/test/client-scopes/<id>/protocol-mappers/models/<id>"));
+        rm -> {
+          rm.provisionManagedClientScopes(List.of(scope("system-a")));
+          rm.provisionManagedClients(List.of(tokenClient()));
+        });
+    assertThat(tokenScopes()).contains("system-a");
+
+    ClientScopeRepresentation excluded = scope("system-a");
+    excluded.setAttributes(Map.of("include.in.token.scope", "false"));
+    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(excluded)));
+    assertThat(tokenScopes()).doesNotContain("system-a");
+
+    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scope("system-a"))));
+
+    assertThat(tokenScopes()).contains("system-a");
   }
 
   @Test
-  void updatesTheScopeAgainWhenRerunWithoutMappers() {
+  void sendsNoWritesWhenRerunUnchanged() {
     withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())));
 
     withRealmManager(
         rm ->
-            assertSendsOnlyWrites(
-                () -> rm.provisionManagedClientScopes(List.of(scope("system-a"))),
-                "PUT /admin/realms/test/client-scopes/<id>"));
+            assertSendsNoWrites(() -> rm.provisionManagedClientScopes(List.of(scopeWithMapper()))));
+  }
+
+  @Test
+  void sendsNoWritesWhenRerunWithoutMappers() {
+    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())));
+
+    withRealmManager(
+        rm ->
+            assertSendsNoWrites(() -> rm.provisionManagedClientScopes(List.of(scope("system-a")))));
   }
 
   private static ClientScopeRepresentation scopeWithMapper() {
@@ -93,6 +112,31 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
     scope.setName(name);
     scope.setProtocol("openid-connect");
     return scope;
+  }
+
+  private static ClientRepresentation tokenClient() {
+    ClientRepresentation client = new ClientRepresentation();
+    client.setClientId("system-token");
+    client.setEnabled(true);
+    client.setPublicClient(false);
+    client.setServiceAccountsEnabled(true);
+    client.setSecret("token-secret");
+    client.setDefaultClientScopes(List.of("system-a"));
+    client.setOptionalClientScopes(List.of());
+    return client;
+  }
+
+  private List<String> tokenScopes() {
+    try (Keycloak keycloak =
+        KeycloakBuilder.builder()
+            .serverUrl(serverUrl())
+            .realm(REALM)
+            .grantType(OAuth2Constants.CLIENT_CREDENTIALS)
+            .clientId("system-token")
+            .clientSecret("token-secret")
+            .build()) {
+      return List.of(keycloak.tokenManager().getAccessToken().getScope().split(" "));
+    }
   }
 
   private static ProtocolMapperRepresentation hardcodedClaim(String name) {

@@ -117,7 +117,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
    * admins then removes the only account left.
    */
   @Test
-  void updatesTheRealmAndUserProfileAgainWhenRerunUnchanged() {
+  void sendsNoWritesWhenRerunUnchanged() {
     MasterRealmConfig config =
         configBuilder(
                 new PermanentAdmin.Standard(
@@ -127,10 +127,29 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
 
     withMaster(
         realmManager ->
-            assertSendsOnlyWrites(
-                () -> new MasterRealmProvisioner(realmManager, config).provision(),
-                "PUT /admin/realms/master",
-                "PUT /admin/realms/master/users/profile"));
+            assertSendsNoWrites(
+                () -> new MasterRealmProvisioner(realmManager, config).provision()));
+  }
+
+  @Test
+  void removesTheSmtpServerWhenItIsNoLongerDeclared() {
+    provision(
+        configBuilder(PermanentAdmin.none())
+            .smtp(
+                new MasterRealmConfig.Smtp(
+                    "keycloak@example.com",
+                    "smtp.example.com",
+                    587,
+                    false,
+                    true,
+                    "mailer",
+                    "secret"))
+            .build());
+    assertThat(masterRealm().getSmtpServer()).containsEntry("host", "smtp.example.com");
+
+    provision(configBuilder(PermanentAdmin.none()).build());
+
+    assertThat(masterRealm().getSmtpServer()).isEmpty();
   }
 
   @Test
