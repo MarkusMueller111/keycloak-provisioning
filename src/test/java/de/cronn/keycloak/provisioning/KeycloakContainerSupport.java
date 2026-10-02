@@ -9,6 +9,7 @@ import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentia
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.function.Supplier;
 import org.keycloak.admin.client.Keycloak;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -71,8 +72,12 @@ abstract class KeycloakContainerSupport implements KeycloakTestTraits {
 
   protected abstract Keycloak adminClient();
 
+  /** For what reports no result, like the provisioning client's bootstrap on connect. */
   protected static void assertSendsNoWrites(Runnable action) {
-    assertSendsOnlyWrites(action);
+    try (KeycloakWriteRecorder recorder = new KeycloakWriteRecorder()) {
+      action.run();
+      assertThat(recorder.writes()).as("writes sent to Keycloak").isEmpty();
+    }
   }
 
   /**
@@ -80,13 +85,20 @@ abstract class KeycloakContainerSupport implements KeycloakTestTraits {
    * connection before calling this, so bootstrapping the provisioning client is not counted against
    * {@code action}.
    */
-  protected static void assertSendsOnlyWrites(Runnable action, String... expectedWrites) {
+  protected static ProvisioningResult assertSendsOnlyWrites(
+      Supplier<ProvisioningResult> action, String... expectedWrites) {
     try (KeycloakWriteRecorder recorder = new KeycloakWriteRecorder()) {
-      action.run();
+      ProvisioningResult result = action.get();
       assertThat(recorder.writes())
           .as("writes sent to Keycloak")
           .containsExactlyInAnyOrder(expectedWrites);
+      return result;
     }
+  }
+
+  /** Neither sends a write nor reports a change. */
+  protected static void assertChangesNothing(Supplier<ProvisioningResult> action) {
+    assertThat(assertSendsOnlyWrites(action).changes()).as("reported changes").isEmpty();
   }
 
   protected DefaultKeycloakConnectionManager connectionManager() {

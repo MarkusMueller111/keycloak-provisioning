@@ -34,8 +34,9 @@ updater has to send that default explicitly — `Declared` does this, and return
 value when it is already equivalent, so an unchanged object produces no diff. The exceptions,
 where `null` means "leave as is": a client's protocol mappers, its scope assignments and its secret.
 
-Every provisioning method has a `sendsNoWritesWhenRerun…` test: `assertSendsNoWrites` records
-each write request at the HTTP level, including ones no differ reports.
+Every provisioning method has a `sendsNoWritesWhenRerun…` test: `assertChangesNothing` checks
+both the reported `ProvisioningResult` and every write request at the HTTP level, including ones
+no differ reports.
 
 ### Adding a provisioning method
 
@@ -44,6 +45,8 @@ each write request at the HTTP level, including ones no differ reports.
 2. Fetch existing state filtered by the fence — never the unfiltered list.
 3. Diff with `AbstractDiffer`, then add, update, delete.
 4. Create before deleting where a rename would otherwise leave a window with neither.
+5. Record every write through `Changes` right before sending it, and return its result. It also
+   logs the change, so do not log writes separately.
 
 The fence is what keeps deletion away from objects this library did not create. `ManagedNaming`
 mints prefixed names for clients, client scopes, groups and roles; flows are fenced only by

@@ -2,7 +2,10 @@ package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Change.Type;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +32,10 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(
         realmManager -> {
           realmManager.provisionFlows(List.of(flow(FLOW, "first")));
-          realmManager.provisionFlows(List.of(flow(FLOW, "second")));
+
+          assertThat(realmManager.provisionFlows(List.of(flow(FLOW, "second"))).changes())
+              .extracting(Change::target, Change::name, Change::type)
+              .containsExactly(tuple(Target.FLOW, FLOW, Type.UPDATED));
         });
 
     assertThat(findFlow(FLOW).getDescription()).isEqualTo("second");
@@ -76,7 +82,11 @@ class FlowProvisioningTest extends SharedKeycloakTest {
 
           FlowExecution required =
               new FlowExecution.Authenticator("auth-cookie", FlowExecution.Requirement.REQUIRED);
-          realmManager.provisionExecutions(Map.of(FLOW, List.of(required)));
+
+          assertThat(realmManager.provisionExecutions(Map.of(FLOW, List.of(required))).changes())
+              .extracting(Change::target, Change::name, Change::parent, Change::type)
+              .containsExactly(
+                  tuple(Target.EXECUTION, "authenticator auth-cookie", FLOW, Type.UPDATED));
         });
 
     withRealmManager(this::validateCustomFlows);
@@ -264,17 +274,19 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     withRealmManager(this::provisionFlowWithExecutions);
 
     withRealmManager(
-        realmManager -> assertSendsNoWrites(() -> provisionFlowWithExecutions(realmManager)));
+        realmManager -> assertChangesNothing(() -> provisionFlowWithExecutions(realmManager)));
   }
 
-  private void provisionFlowWithExecutions(RealmManager realmManager) {
-    realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
-    realmManager.provisionExecutions(
-        Map.of(
-            FLOW,
-            List.of(
-                execution("auth-cookie"),
-                new FlowExecution.SubFlow("nested", "a nested flow", null))));
+  private ProvisioningResult provisionFlowWithExecutions(RealmManager realmManager) {
+    return realmManager
+        .provisionFlows(List.of(flow(FLOW, "a test flow")))
+        .plus(
+            realmManager.provisionExecutions(
+                Map.of(
+                    FLOW,
+                    List.of(
+                        execution("auth-cookie"),
+                        new FlowExecution.SubFlow("nested", "a nested flow", null)))));
   }
 
   private static AuthenticationFlowRepresentation flow(String alias, String description) {

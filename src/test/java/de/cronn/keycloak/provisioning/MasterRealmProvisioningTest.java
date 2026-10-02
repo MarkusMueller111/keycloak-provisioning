@@ -127,7 +127,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
 
     withMaster(
         realmManager ->
-            assertSendsNoWrites(
+            assertChangesNothing(
                 () -> new MasterRealmProvisioner(realmManager, config).provision()));
   }
 

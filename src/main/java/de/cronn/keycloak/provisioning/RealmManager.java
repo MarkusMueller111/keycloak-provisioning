@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import de.cronn.commons.lang.StreamUtil;
+import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
@@ -120,7 +121,8 @@ public class RealmManager {
    * listed. {@code roleNames} is treated as the full desired set, the same "declare it all"
    * semantics as {@link MasterRealmConfig#builtInClients()}. Safe to call repeatedly.
    */
-  public void provisionDefaultRoleComposites(Collection<String> roleNames) {
+  public ProvisioningResult provisionDefaultRoleComposites(Collection<String> roleNames) {
+    Changes changes = changes();
     RealmResource realm = getRealmResource();
     RoleRepresentation defaultRole = realm.toRepresentation().getDefaultRole();
     RoleResource defaultRoleResource = realm.roles().get(defaultRole.getName());
@@ -135,20 +137,17 @@ public class RealmManager {
             .map(name -> realm.roles().get(name).toRepresentation())
             .toList();
     if (!toAdd.isEmpty()) {
-      log.info(
-          "Adding default role composites: {}",
-          toAdd.stream().map(RoleRepresentation::getName).toList());
+      toAdd.forEach(role -> changes.added(Target.DEFAULT_ROLE_COMPOSITE, role.getName()));
       defaultRoleResource.addComposites(toAdd);
     }
 
     List<RoleRepresentation> toRemove =
         existingComposites.stream().filter(role -> !roleNames.contains(role.getName())).toList();
     if (!toRemove.isEmpty()) {
-      log.info(
-          "Removing default role composites no longer configured: {}",
-          toRemove.stream().map(RoleRepresentation::getName).toList());
+      toRemove.forEach(role -> changes.removed(Target.DEFAULT_ROLE_COMPOSITE, role.getName()));
       defaultRoleResource.deleteComposites(toRemove);
     }
+    return changes.result();
   }
 
   /**
@@ -159,7 +158,8 @@ public class RealmManager {
    * library or a consumer provisioned are out of scope, those belong to {@link
    * #provisionManagedClients(List)}.
    */
-  public void provisionBuiltInClients(Collection<BuiltInClientConfig> builtInClients) {
+  public ProvisioningResult provisionBuiltInClients(
+      Collection<BuiltInClientConfig> builtInClients) {
     Map<KeycloakProvidedClient, BuiltInClientConfig> byClient = new LinkedHashMap<>();
     for (BuiltInClientConfig config : builtInClients) {
       // Before the first write: two entries for one client contradict each other, and reporting
@@ -170,6 +170,7 @@ public class RealmManager {
           config.client().getClientId());
     }
 
+    Changes changes = changes();
     ClientsResource clientsResource = getRealmResource().clients();
     Map<String, ClientRepresentation> existingByClientId =
         clientsResource.findAll().stream()
@@ -190,12 +191,13 @@ public class RealmManager {
         continue;
       }
 
-      log.info(
-          "Built-in client '{}' requires an update:\n{}",
+      changes.updated(
+          Target.BUILT_IN_CLIENT,
           builtIn.getClientId(),
           Differ.calculateMultilineDiff(before, after));
       clientsResource.get(client.getId()).update(client);
     }
+    return changes.result();
   }
 
   /**
@@ -203,11 +205,12 @@ public class RealmManager {
    * only when that actually changes something. Safe to call repeatedly: an unchanged realm causes
    * no write at all, which is the common case when provisioning runs on every application start.
    */
-  public void createOrUpdateRealm(Consumer<RealmRepresentation> realmCustomizer) {
+  public ProvisioningResult createOrUpdateRealm(Consumer<RealmRepresentation> realmCustomizer) {
+    Changes changes = changes();
     Optional<RealmRepresentation> existingRealm = getRealmIfExists();
     if (existingRealm.isEmpty()) {
-      createRealm(realmCustomizer);
-      return;
+      createRealm(realmCustomizer, changes);
+      return changes.result();
     }
 
     RealmRepresentation realm = existingRealm.get();
@@ -217,18 +220,16 @@ public class RealmManager {
 
     if (before.equals(after)) {
       log.debug("Realm '{}' is up to date", realmName);
-      return;
+      return changes.result();
     }
 
-    log.info(
-        "Realm '{}' already exists, but update is required:\n{}",
-        realmName,
-        Differ.calculateMultilineDiff(before, after));
+    changes.updated(Target.REALM, realmName, Differ.calculateMultilineDiff(before, after));
     getRealmResource().update(realm);
+    return changes.result();
   }
 
-  private void createRealm(Consumer<RealmRepresentation> realmCustomizer) {
-    log.info("Creating realm '{}'", realmName);
+  private void createRealm(Consumer<RealmRepresentation> realmCustomizer, Changes changes) {
+    changes.added(Target.REALM, realmName);
     RealmRepresentation realm = new RealmRepresentation();
     realm.setRealm(realmName);
     realm.setEnabled(true);
@@ -244,13 +245,13 @@ public class RealmManager {
         .collect(StreamUtil.toSingleOptionalElement());
   }
 
-  public void provisionManagedClients(List<ClientRepresentation> clients) {
+  public ProvisioningResult provisionManagedClients(List<ClientRepresentation> clients) {
     clients.forEach(this::assertClientIsManaged);
     clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
     clients.forEach(RealmManager::assertRedirectUrisAreNotWildcards);
     clients.forEach(RealmManager::applySecurityFlagDefaults);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
-    provisionManagedClients(clients, existingClientsPredicate);
+    return provisionManagedClients(clients, existingClientsPredicate);
   }
 
   /**
@@ -302,14 +303,15 @@ public class RealmManager {
    * provisioning client itself, which must stay clear of {@link #provisionManagedClients} so a
    * consumer's own provisioning does not delete the identity it is connected as.
    */
-  public void createOrUpdateUnmanagedClient(ClientRepresentation client) {
+  public ProvisioningResult createOrUpdateUnmanagedClient(ClientRepresentation client) {
     String clientId = client.getClientId();
     Validate.isTrue(
         !clientNaming.isManaged(client),
         "Client '%s' carries the managed prefix '%s' and belongs in provisionManagedClients",
         clientId,
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
-    provisionManagedClients(List.of(client), existing -> clientId.equals(existing.getClientId()));
+    return provisionManagedClients(
+        List.of(client), existing -> clientId.equals(existing.getClientId()));
   }
 
   /**
@@ -351,21 +353,23 @@ public class RealmManager {
             + " (an empty list assigns none) or neither (Keycloak's defaults apply).");
   }
 
-  void provisionManagedClients(
+  private ProvisioningResult provisionManagedClients(
       List<ClientRepresentation> clients,
       Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
+    Changes changes = changes();
     List<ClientRepresentation> existingClients =
         getRealmResource().clients().findAll().stream()
             .filter(existingClientsToConsiderPredicate)
             .toList();
 
     ClientRepresentationDiffer clientDiffer = getClientsDiffer(existingClients, clients);
-    clientDiffer.getElementsToAdd().forEach(this::addClient);
-    clientDiffer.getElementsToDelete().forEach(this::deleteClient);
-    clientDiffer.getElementsToUpdate().forEach(this::updateClient);
+    clientDiffer.getElementsToAdd().forEach(client -> addClient(client, changes));
+    clientDiffer.getElementsToDelete().forEach(client -> deleteClient(client, changes));
+    clientDiffer.getElementsToUpdate().forEach(update -> updateClient(update, changes));
 
-    provisionClientScopeAssignments(clients);
-    provisionClientProtocolMappers(clients);
+    provisionClientScopeAssignments(clients, changes);
+    provisionClientProtocolMappers(clients, changes);
+    return changes.result();
   }
 
   /**
@@ -376,8 +380,10 @@ public class RealmManager {
    * <p>A scope's own update ignores its protocol mappers, so those are provisioned separately. A
    * {@code null} mapper list on a scope leaves its mappers alone.
    */
-  public void provisionManagedClientScopes(List<ClientScopeRepresentation> clientScopes) {
+  public ProvisioningResult provisionManagedClientScopes(
+      List<ClientScopeRepresentation> clientScopes) {
     clientScopes.forEach(this::assertClientScopeIsManaged);
+    Changes changes = changes();
 
     ClientScopesResource scopesResource = getRealmResource().clientScopes();
     List<ClientScopeRepresentation> existingScopes =
@@ -387,23 +393,23 @@ public class RealmManager {
         new ClientScopeRepresentationDiffer(existingScopes, clientScopes);
 
     for (ClientScopeRepresentation scope : differ.getElementsToDelete()) {
-      log.info("Removing client scope '{}' from Keycloak realm '{}'", scope.getName(), realmName);
+      changes.removed(Target.CLIENT_SCOPE, scope.getName());
       scopesResource.get(scope.getId()).remove();
     }
     for (ClientScopeRepresentation scope : differ.getElementsToAdd()) {
-      log.info("Adding client scope '{}' to Keycloak realm '{}'", scope.getName(), realmName);
+      changes.added(Target.CLIENT_SCOPE, scope.getName());
       try (Response response = scopesResource.create(scope)) {
         assertResponseIs201Created(response);
       }
     }
     for (ToUpdate<ClientScopeRepresentation> update : differ.getElementsToUpdate()) {
       ClientScopeRepresentation scope = update.newState();
-      log.info(
-          "Client scope '{}' requires an update:\n{}", scope.getName(), update.multiLineDiff());
+      changes.updated(Target.CLIENT_SCOPE, scope.getName(), update.multiLineDiff());
       scopesResource.get(scope.getId()).update(scope);
     }
 
-    provisionClientScopeProtocolMappers(clientScopes);
+    provisionClientScopeProtocolMappers(clientScopes, changes);
+    return changes.result();
   }
 
   private void assertClientScopeIsManaged(ClientScopeRepresentation clientScope) {
@@ -417,7 +423,8 @@ public class RealmManager {
     }
   }
 
-  private void provisionClientScopeProtocolMappers(List<ClientScopeRepresentation> clientScopes) {
+  private void provisionClientScopeProtocolMappers(
+      List<ClientScopeRepresentation> clientScopes, Changes changes) {
     Map<String, String> scopeIdsByName =
         getRealmResource().clientScopes().findAll().stream()
             .collect(
@@ -432,7 +439,8 @@ public class RealmManager {
       provisionProtocolMappers(
           getRealmResource().clientScopes().get(id).getProtocolMappers(),
           scope.getProtocolMappers(),
-          scope.getName());
+          scope.getName(),
+          changes);
     }
   }
 
@@ -441,7 +449,7 @@ public class RealmManager {
    * alone, an empty one removes every mapper. Keycloak returns mappers in its own order and with
    * ids of its own, so they are matched by name.
    */
-  private void provisionClientProtocolMappers(List<ClientRepresentation> clients) {
+  private void provisionClientProtocolMappers(List<ClientRepresentation> clients, Changes changes) {
     for (ClientRepresentation client : clients) {
       if (client.getProtocolMappers() == null) {
         continue;
@@ -452,36 +460,34 @@ public class RealmManager {
                   provisionProtocolMappers(
                       clientResource.getProtocolMappers(),
                       client.getProtocolMappers(),
-                      client.getClientId()));
+                      client.getClientId(),
+                      changes));
     }
   }
 
   private void provisionProtocolMappers(
       ProtocolMappersResource mappersResource,
       List<ProtocolMapperRepresentation> desiredMappers,
-      String owner) {
+      String parent,
+      Changes changes) {
     List<ProtocolMapperRepresentation> existingMappers = mappersResource.getMappers();
     ProtocolMapperDiffer differ =
         new ProtocolMapperDiffer(
             existingMappers == null ? List.of() : existingMappers, desiredMappers);
 
     for (ProtocolMapperRepresentation mapper : differ.getElementsToDelete()) {
-      log.info("Removing protocol mapper '{}' from '{}'", mapper.getName(), owner);
+      changes.removed(Target.PROTOCOL_MAPPER, mapper.getName(), parent);
       mappersResource.delete(mapper.getId());
     }
     for (ProtocolMapperRepresentation mapper : differ.getElementsToAdd()) {
-      log.info("Adding protocol mapper '{}' to '{}'", mapper.getName(), owner);
+      changes.added(Target.PROTOCOL_MAPPER, mapper.getName(), parent);
       try (Response response = mappersResource.createMapper(mapper)) {
         assertResponseIs201Created(response);
       }
     }
     for (ToUpdate<ProtocolMapperRepresentation> update : differ.getElementsToUpdate()) {
       ProtocolMapperRepresentation mapper = update.newState();
-      log.info(
-          "Protocol mapper '{}' of '{}' requires an update:\n{}",
-          mapper.getName(),
-          owner,
-          update.multiLineDiff());
+      changes.updated(Target.PROTOCOL_MAPPER, mapper.getName(), parent, update.multiLineDiff());
       mappersResource.update(mapper.getId(), mapper);
     }
   }
@@ -493,7 +499,8 @@ public class RealmManager {
    * list means "not declared" and is left alone, so assignments made outside this library survive.
    * An empty list removes every assignment.
    */
-  private void provisionClientScopeAssignments(List<ClientRepresentation> clients) {
+  private void provisionClientScopeAssignments(
+      List<ClientRepresentation> clients, Changes changes) {
     boolean anyScopesConfigured =
         clients.stream()
             .anyMatch(
@@ -513,30 +520,34 @@ public class RealmManager {
     for (ClientRepresentation client : clients) {
       getClientByClientId(client.getClientId())
           .ifPresent(
-              clientResource -> provisionClientScopes(clientResource, client, scopeIdsByName));
+              clientResource ->
+                  provisionClientScopes(clientResource, client, scopeIdsByName, changes));
     }
   }
 
   private void provisionClientScopes(
       ClientResource clientResource,
       ClientRepresentation desiredClient,
-      Map<String, String> scopeIdsByName) {
+      Map<String, String> scopeIdsByName,
+      Changes changes) {
     provisionClientScopes(
         desiredClient.getClientId(),
         desiredClient.getDefaultClientScopes(),
         scopeNames(clientResource.getDefaultClientScopes()),
         scopeIdsByName,
-        "default",
+        Target.DEFAULT_CLIENT_SCOPE,
         clientResource::addDefaultClientScope,
-        clientResource::removeDefaultClientScope);
+        clientResource::removeDefaultClientScope,
+        changes);
     provisionClientScopes(
         desiredClient.getClientId(),
         desiredClient.getOptionalClientScopes(),
         scopeNames(clientResource.getOptionalClientScopes()),
         scopeIdsByName,
-        "optional",
+        Target.OPTIONAL_CLIENT_SCOPE,
         clientResource::addOptionalClientScope,
-        clientResource::removeOptionalClientScope);
+        clientResource::removeOptionalClientScope,
+        changes);
   }
 
   private void provisionClientScopes(
@@ -544,20 +555,21 @@ public class RealmManager {
       List<String> desiredScopeNames,
       List<String> assignedScopeNames,
       Map<String, String> scopeIdsByName,
-      String kind,
+      Target target,
       Consumer<String> assign,
-      Consumer<String> unassign) {
+      Consumer<String> unassign,
+      Changes changes) {
     if (desiredScopeNames == null) {
       return;
     }
 
     AbstractDiffer<String> differ = new AbstractDiffer<>(assignedScopeNames, desiredScopeNames);
     for (String scopeName : differ.getElementsToDelete()) {
-      log.info("Removing {} client scope '{}' from client '{}'", kind, scopeName, clientId);
+      changes.removed(target, scopeName, clientId);
       unassign.accept(resolveClientScopeId(scopeIdsByName, scopeName));
     }
     for (String scopeName : differ.getElementsToAdd()) {
-      log.info("Adding {} client scope '{}' to client '{}'", kind, scopeName, clientId);
+      changes.added(target, scopeName, clientId);
       assign.accept(resolveClientScopeId(scopeIdsByName, scopeName));
     }
   }
@@ -575,29 +587,26 @@ public class RealmManager {
     return scopeId;
   }
 
-  void addClient(ClientRepresentation clientRepresentation) {
-    log.info("Adding client '{}'", clientRepresentation.getClientId());
+  private void addClient(ClientRepresentation clientRepresentation, Changes changes) {
+    changes.added(Target.CLIENT, clientRepresentation.getClientId());
     try (Response response = getRealmResource().clients().create(clientRepresentation)) {
       assertResponseIs201Created(response);
     }
   }
 
-  void deleteClient(ClientRepresentation clientRepresentation) {
-    log.info(
-        "Removing client '{}' from Keycloak realm '{}'",
-        clientRepresentation.getClientId(),
-        realmName);
+  private void deleteClient(ClientRepresentation clientRepresentation, Changes changes) {
+    changes.removed(Target.CLIENT, clientRepresentation.getClientId());
     getRealmResource().clients().get(clientRepresentation.getId()).remove();
   }
 
-  void updateClient(ToUpdate<ClientRepresentation> update) {
+  private void updateClient(ToUpdate<ClientRepresentation> update, Changes changes) {
     ClientRepresentation newClient = update.newState();
-    log.info(
-        "Client '{}' already exists, but update is required:\n{}",
-        newClient.getClientId(),
-        update.multiLineDiff());
+    changes.updated(Target.CLIENT, newClient.getClientId(), update.multiLineDiff());
     getRealmResource().clients().get(newClient.getId()).update(newClient);
-    log.info("Client '{}' updated.", newClient.getClientId());
+  }
+
+  private Changes changes() {
+    return new Changes(log, realmName);
   }
 
   public RealmResource getRealmResource() {
@@ -663,7 +672,6 @@ public class RealmManager {
   }
 
   public void deleteUser(String userId) {
-    log.info("Deleting user with id '{}'", userId);
     try (Response response = getRealmResource().users().delete(userId)) {
       assertResponseIs204NoContent(response);
     }
@@ -706,39 +714,44 @@ public class RealmManager {
    * MasterRealmConfig#builtInClients()}. Keycloak's own flows are never touched, so only flows
    * created outside this call are at risk of deletion. Safe to call repeatedly.
    */
-  public void provisionFlows(List<AuthenticationFlowRepresentation> flows) {
+  public ProvisioningResult provisionFlows(List<AuthenticationFlowRepresentation> flows) {
+    Changes changes = changes();
     List<AuthenticationFlowRepresentation> existingFlows =
         getRealmResource().flows().getFlows().stream()
             .filter(flow -> flow.isBuiltIn() != Boolean.TRUE)
             .toList();
 
     // Create first: renaming a flow would otherwise leave a window with neither.
-    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows));
+    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows, changes));
 
     Set<String> configuredAliases =
         flows.stream().map(AuthenticationFlowRepresentation::getAlias).collect(Collectors.toSet());
     existingFlows.stream()
         .filter(flow -> !configuredAliases.contains(flow.getAlias()))
-        .forEach(this::deleteFlow);
+        .forEach(flow -> deleteFlow(flow, changes));
+    return changes.result();
   }
 
   private void createOrUpdateFlow(
-      AuthenticationFlowRepresentation flow, List<AuthenticationFlowRepresentation> existingFlows) {
+      AuthenticationFlowRepresentation flow,
+      List<AuthenticationFlowRepresentation> existingFlows,
+      Changes changes) {
     Optional<AuthenticationFlowRepresentation> existingFlow =
         existingFlows.stream().filter(f -> Objects.equals(f.getAlias(), flow.getAlias())).findAny();
     if (existingFlow.isEmpty()) {
-      log.info(
-          "Adding authentication flow '{}' to Keycloak realm '{}'", flow.getAlias(), realmName);
+      changes.added(Target.FLOW, flow.getAlias());
       try (Response response = getRealmResource().flows().createFlow(flow)) {
         assertResponseIs201Created(response);
       }
     } else {
-      updateFlowIfChanged(existingFlow.get(), flow);
+      updateFlowIfChanged(existingFlow.get(), flow, changes);
     }
   }
 
   private void updateFlowIfChanged(
-      AuthenticationFlowRepresentation existingFlow, AuthenticationFlowRepresentation flow) {
+      AuthenticationFlowRepresentation existingFlow,
+      AuthenticationFlowRepresentation flow,
+      Changes changes) {
     String description = Declared.orUnset(flow.getDescription(), existingFlow.getDescription());
     if (Objects.equals(description, existingFlow.getDescription())
         && Objects.equals(flow.getProviderId(), existingFlow.getProviderId())
@@ -752,14 +765,28 @@ public class RealmManager {
     update.setProviderId(flow.getProviderId());
     update.setTopLevel(flow.isTopLevel());
     update.setBuiltIn(flow.isBuiltIn());
-    log.info(
-        "Updating authentication flow '{}' on Keycloak realm '{}'", flow.getAlias(), realmName);
+    changes.updated(
+        Target.FLOW,
+        flow.getAlias(),
+        Differ.calculateMultilineDiff(
+            AbstractDiffer.toJson(flowFields(existingFlow)), AbstractDiffer.toJson(update)));
     getRealmResource().flows().updateFlow(existingFlow.getId(), update);
   }
 
-  private void deleteFlow(AuthenticationFlowRepresentation flow) {
-    log.info(
-        "Removing authentication flow '{}' from Keycloak realm '{}'", flow.getAlias(), realmName);
+  /** Without the id and the executions, which a flow's update does not carry. */
+  private static AuthenticationFlowRepresentation flowFields(
+      AuthenticationFlowRepresentation flow) {
+    AuthenticationFlowRepresentation fields = new AuthenticationFlowRepresentation();
+    fields.setAlias(flow.getAlias());
+    fields.setDescription(flow.getDescription());
+    fields.setProviderId(flow.getProviderId());
+    fields.setTopLevel(flow.isTopLevel());
+    fields.setBuiltIn(flow.isBuiltIn());
+    return fields;
+  }
+
+  private void deleteFlow(AuthenticationFlowRepresentation flow, Changes changes) {
+    changes.removed(Target.FLOW, flow.getAlias());
     getRealmResource().flows().deleteFlow(flow.getId());
   }
 
@@ -772,7 +799,9 @@ public class RealmManager {
    * it has run, so pass an ordered map: with {@link Map#of} the order is unspecified and an entry
    * naming a sub-flow can run first and fail with a 404.
    */
-  public void provisionExecutions(Map<String, List<FlowExecution>> configuredExecutions) {
+  public ProvisioningResult provisionExecutions(
+      Map<String, List<FlowExecution>> configuredExecutions) {
+    Changes changes = changes();
     configuredExecutions.forEach(
         (flowName, flowExecutions) -> {
           List<AuthenticationExecutionInfoRepresentation> executions =
@@ -786,10 +815,11 @@ public class RealmManager {
 
           AuthenticationExecutionRepresentationDiffer differ =
               getExecutionDiffer(existingExecutions, executions);
-          differ.getElementsToDelete().forEach(exe -> deleteExecution(exe, flowName));
-          differ.getElementsToAdd().forEach(exe -> addExecution(exe, flowName));
-          differ.getElementsToUpdate().forEach(exe -> updateExecution(exe, flowName));
+          differ.getElementsToDelete().forEach(exe -> deleteExecution(exe, flowName, changes));
+          differ.getElementsToAdd().forEach(exe -> addExecution(exe, flowName, changes));
+          differ.getElementsToUpdate().forEach(exe -> updateExecution(exe, flowName, changes));
         });
+    return changes.result();
   }
 
   /**
@@ -856,22 +886,16 @@ public class RealmManager {
   }
 
   private void deleteExecution(
-      AuthenticationExecutionInfoRepresentation execution, String parentFlow) {
-    log.info(
-        "Removing authentication execution '{}' from parent flow '{}' in Keycloak realm '{}'",
-        execution.getProviderId(),
-        parentFlow,
-        realmName);
+      AuthenticationExecutionInfoRepresentation execution, String parentFlow, Changes changes) {
+    changes.removed(
+        Target.EXECUTION, AuthenticationExecutionRepresentationDiffer.id(execution), parentFlow);
     getRealmResource().flows().removeExecution(execution.getId());
   }
 
   private void addExecution(
-      AuthenticationExecutionInfoRepresentation execution, String parentFlow) {
-    log.info(
-        "Adding authentication execution '{}' to parent flow {} to Keycloak realm '{}'",
-        execution.getProviderId(),
-        parentFlow,
-        realmName);
+      AuthenticationExecutionInfoRepresentation execution, String parentFlow, Changes changes) {
+    changes.added(
+        Target.EXECUTION, AuthenticationExecutionRepresentationDiffer.id(execution), parentFlow);
     if (execution.getAuthenticationFlow() == Boolean.TRUE) {
       getRealmResource()
           .flows()
@@ -909,17 +933,20 @@ public class RealmManager {
   }
 
   private void updateExecution(
-      ToUpdate<AuthenticationExecutionInfoRepresentation> toUpdate, String parentFlow) {
+      ToUpdate<AuthenticationExecutionInfoRepresentation> toUpdate,
+      String parentFlow,
+      Changes changes) {
     AuthenticationExecutionInfoRepresentation executionUpdate = toUpdate.newState();
-    log.info(
-        "Updating authentication execution '{}' of parent flow {} on Keycloak realm '{}'",
-        executionUpdate.getProviderId(),
+    changes.updated(
+        Target.EXECUTION,
+        AuthenticationExecutionRepresentationDiffer.id(executionUpdate),
         parentFlow,
-        realmName);
+        toUpdate.multiLineDiff());
     getRealmResource().flows().updateExecutions(parentFlow, executionUpdate);
   }
 
-  public void provisionUserProfile(UserProfileConfig userProfileConfig) {
+  public ProvisioningResult provisionUserProfile(UserProfileConfig userProfileConfig) {
+    Changes changes = changes();
     UserProfileResource userProfileResource = getRealmResource().users().userProfile();
     UPConfig upConfig = userProfileResource.getConfiguration();
     String before = AbstractDiffer.toJson(upConfig);
@@ -932,19 +959,6 @@ public class RealmManager {
     UserProfileAttributeDiffer differ =
         new UserProfileAttributeDiffer(upConfig.getAttributes(), desiredAttributes);
 
-    differ
-        .getElementsToDelete()
-        .forEach(a -> log.info("Removing user profile attribute '{}'", a.getName()));
-    differ
-        .getElementsToAdd()
-        .forEach(a -> log.info("Adding user profile attribute '{}'", a.getName()));
-    for (ToUpdate<UPAttribute> update : differ.getElementsToUpdate()) {
-      log.info(
-          "User profile attribute '{}' updated:\n{}",
-          update.newState().getName(),
-          update.multiLineDiff());
-    }
-
     // getElementsToUpdate() already mutated upConfig's own attribute elements in place; only
     // add/delete require explicit list surgery here.
     List<UPAttribute> resultingAttributes = new ArrayList<>(upConfig.getAttributes());
@@ -953,9 +967,12 @@ public class RealmManager {
     upConfig.setAttributes(resultingAttributes);
 
     userProfileConfig.userProfileCustomizer().accept(upConfig);
-    if (!before.equals(AbstractDiffer.toJson(upConfig))) {
+    String after = AbstractDiffer.toJson(upConfig);
+    if (!before.equals(after)) {
+      changes.updated(Target.USER_PROFILE, realmName, Differ.calculateMultilineDiff(before, after));
       userProfileResource.update(upConfig);
     }
+    return changes.result();
   }
 
   private static void ensureGroupsExist(
@@ -967,11 +984,7 @@ public class RealmManager {
         .filter(Objects::nonNull)
         .distinct()
         .filter(groupName -> !existingGroupNames.contains(groupName))
-        .forEach(
-            groupName -> {
-              log.info("Adding user profile group '{}'", groupName);
-              upConfig.addGroup(new UPGroup(groupName));
-            });
+        .forEach(groupName -> upConfig.addGroup(new UPGroup(groupName)));
   }
 
   private static UPAttribute buildAttribute(UserProfileConfig.AttributeConfig attributeConfig) {

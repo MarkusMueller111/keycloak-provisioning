@@ -1,7 +1,10 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Change.Type;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,7 +25,11 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
 
     ClientScopeRepresentation renamedDescription = scope("system-a");
     renamedDescription.setDescription("changed");
-    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(renamedDescription)));
+    withRealmManager(
+        rm ->
+            assertThat(rm.provisionManagedClientScopes(List.of(renamedDescription)).changes())
+                .extracting(Change::target, Change::name, Change::type)
+                .containsExactly(tuple(Target.CLIENT_SCOPE, "system-a", Type.UPDATED)));
 
     assertThat(findScope("system-a").getDescription()).isEqualTo("changed");
   }
@@ -89,7 +96,8 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
 
     withRealmManager(
         rm ->
-            assertSendsNoWrites(() -> rm.provisionManagedClientScopes(List.of(scopeWithMapper()))));
+            assertChangesNothing(
+                () -> rm.provisionManagedClientScopes(List.of(scopeWithMapper()))));
   }
 
   @Test
@@ -98,7 +106,8 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
 
     withRealmManager(
         rm ->
-            assertSendsNoWrites(() -> rm.provisionManagedClientScopes(List.of(scope("system-a")))));
+            assertChangesNothing(
+                () -> rm.provisionManagedClientScopes(List.of(scope("system-a")))));
   }
 
   private static ClientScopeRepresentation scopeWithMapper() {

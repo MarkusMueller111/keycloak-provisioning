@@ -40,8 +40,8 @@ public class AppRealmProvisioner {
     }
   }
 
-  public void provision() {
-    realmManager.createOrUpdateRealm(this::configureRealm);
+  public ProvisioningResult provision() {
+    return realmManager.createOrUpdateRealm(this::configureRealm);
   }
 
   public RealmManager getRealmManager() {

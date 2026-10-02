@@ -162,7 +162,7 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
 
     withAppRealmManager(
         realmManager ->
-            assertSendsNoWrites(() -> new AppRealmProvisioner(realmManager, config).provision()));
+            assertChangesNothing(() -> new AppRealmProvisioner(realmManager, config).provision()));
   }
 
   @Test

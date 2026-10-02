@@ -2,7 +2,10 @@ package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Change.Type;
 import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import java.util.function.Consumer;
@@ -42,7 +45,11 @@ class UserProvisioningTest extends SharedKeycloakTest {
     changed.setEmailVerified(false);
     changed.setFirstName("Alicia");
     changed.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(changed)));
+    withTestUserProvisioner(
+        p ->
+            assertThat(p.provisionUsers(List.of(changed)).changes())
+                .extracting(Change::target, Change::name, Change::type)
+                .containsExactly(tuple(Target.USER, "alice", Type.UPDATED)));
 
     UserRepresentation actual = findUser("alice");
     assertThat(actual.isEnabled()).isFalse();
@@ -81,7 +88,7 @@ class UserProvisioningTest extends SharedKeycloakTest {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
 
     withTestUserProvisioner(
-        p -> assertSendsNoWrites(() -> p.provisionUsers(List.of(user("alice")))));
+        p -> assertChangesNothing(() -> p.provisionUsers(List.of(user("alice")))));
   }
 
   @Test
@@ -90,7 +97,7 @@ class UserProvisioningTest extends SharedKeycloakTest {
     undeclared.setEnabled(null);
     withTestUserProvisioner(p -> p.provisionUsers(List.of(undeclared)));
 
-    withTestUserProvisioner(p -> assertSendsNoWrites(() -> p.provisionUsers(List.of(undeclared))));
+    withTestUserProvisioner(p -> assertChangesNothing(() -> p.provisionUsers(List.of(undeclared))));
   }
 
   @Test
@@ -99,9 +106,13 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
     withTestUserProvisioner(
         p ->
-            assertSendsOnlyWrites(
-                () -> p.provisionUsers(List.of(userWithPassword("alice"))),
-                "PUT /admin/realms/test/users/<id>/reset-password"));
+            assertThat(
+                    assertSendsOnlyWrites(
+                            () -> p.provisionUsers(List.of(userWithPassword("alice"))),
+                            "PUT /admin/realms/test/users/<id>/reset-password")
+                        .changes())
+                .extracting(Change::target, Change::name, Change::type)
+                .containsExactly(tuple(Target.PASSWORD, "alice", Type.UPDATED)));
   }
 
   @Test

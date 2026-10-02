@@ -1,9 +1,11 @@
 package de.cronn.keycloak.provisioning.master;
 
+import de.cronn.keycloak.provisioning.Change.Target;
+import de.cronn.keycloak.provisioning.Changes;
 import de.cronn.keycloak.provisioning.KeycloakException;
+import de.cronn.keycloak.provisioning.ProvisioningResult;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.SecurityHeader;
-import de.cronn.keycloak.provisioning.UserProfileConfig;
 import de.cronn.keycloak.provisioning.differ.Declared;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -49,14 +51,17 @@ public class MasterRealmProvisioner {
   }
 
   /** Runs all provisioning steps against the master realm, using the given config. */
-  public void provision() {
-    configureRealm();
-    provisionBuiltInClients();
-    configureRequiredActions();
-    provisionDefaultRealmRoleComposites();
-    provisionUserProfile();
-    createPermanentAdminIfAbsent();
-    deleteTemporaryAdminUsers();
+  public ProvisioningResult provision() {
+    ProvisioningResult result =
+        configureRealm()
+            .plus(realmManager.provisionBuiltInClients(config.builtInClients()))
+            .plus(configureRequiredActions())
+            .plus(realmManager.provisionDefaultRoleComposites(config.defaultRoleComposites()))
+            .plus(realmManager.provisionUserProfile(config.userProfile()));
+    Changes changes = new Changes(log, realmManager.getRealmName());
+    createPermanentAdminIfAbsent(changes);
+    deleteTemporaryAdminUsers(changes);
+    return result.plus(changes.result());
   }
 
   /** The master {@link RealmManager}, for anything beyond what this class covers. */
@@ -64,10 +69,11 @@ public class MasterRealmProvisioner {
     return realmManager;
   }
 
-  private void configureRealm() {
-    realmManager.createOrUpdateRealm(this::configureRealm);
+  private ProvisioningResult configureRealm() {
+    ProvisioningResult result = realmManager.createOrUpdateRealm(this::configureRealm);
     // A changed frontend URL changes the token issuer, which the current token no longer matches.
     realmManager.refreshToken();
+    return result;
   }
 
   private void configureRealm(RealmRepresentation realmRepresentation) {
@@ -98,22 +104,18 @@ public class MasterRealmProvisioner {
     config.realmCustomizer().accept(realmRepresentation);
   }
 
-  private void provisionBuiltInClients() {
-    realmManager.provisionBuiltInClients(config.builtInClients());
-  }
-
   /** Also covers admins created via {@code kc.sh bootstrap-admin}, which carry the same marker. */
-  private void deleteTemporaryAdminUsers() {
+  private void deleteTemporaryAdminUsers(Changes changes) {
     if (!config.deleteTemporaryAdminUsers()) {
       return;
     }
     for (UserRepresentation temporaryAdmin : realmManager.getUsersMarkedAsTemporaryAdmin()) {
-      log.info("Deleting temporary admin user '{}'", temporaryAdmin.getUsername());
+      changes.removed(Target.USER, temporaryAdmin.getUsername());
       realmManager.deleteUser(temporaryAdmin.getId());
     }
   }
 
-  private void createPermanentAdminIfAbsent() {
+  private void createPermanentAdminIfAbsent(Changes changes) {
     PermanentAdmin permanentAdmin = config.permanentAdmin();
     if (permanentAdmin instanceof PermanentAdmin.None) {
       return;
@@ -129,7 +131,7 @@ public class MasterRealmProvisioner {
       return;
     }
 
-    log.info("Creating permanent admin '{}'", username);
+    changes.added(Target.PERMANENT_ADMIN, username);
     String userId = realmManager.createUser(user);
     try {
       UserResource userResource = realmManager.getUserResource(userId);
@@ -138,6 +140,7 @@ public class MasterRealmProvisioner {
     } catch (RuntimeException e) {
       // Roll back, so a half-created admin is not mistaken for an existing one on the next run,
       // which would then delete the temporary admins and leave the realm unreachable.
+      log.info("Deleting half-created permanent admin '{}'", username);
       realmManager.deleteUser(userId);
       throw e;
     }
@@ -146,7 +149,7 @@ public class MasterRealmProvisioner {
   /**
    * Naming the permanent admin after a temporary one would leave the realm unreachable: it is taken
    * for already provisioned, so it keeps the bootstrap password and never gets the required
-   * actions, and {@link #deleteTemporaryAdminUsers()} then removes it as the last step.
+   * actions, and {@link #deleteTemporaryAdminUsers(Changes)} then removes it as the last step.
    */
   private void assertIsNotATemporaryAdmin(UserRepresentation existing) {
     boolean isTemporaryAdmin =
@@ -161,17 +164,10 @@ public class MasterRealmProvisioner {
     }
   }
 
-  private void provisionUserProfile() {
-    UserProfileConfig userProfileConfig = config.userProfile();
-    realmManager.provisionUserProfile(userProfileConfig);
-  }
-
-  private void provisionDefaultRealmRoleComposites() {
-    realmManager.provisionDefaultRoleComposites(config.defaultRoleComposites());
-  }
-
-  private void configureRequiredActions() {
-    realmManager.getAuthenticationManagementManager().configure(config.authenticationManagement());
+  private ProvisioningResult configureRequiredActions() {
+    return realmManager
+        .getAuthenticationManagementManager()
+        .configure(config.authenticationManagement());
   }
 
   private static void setAttribute(

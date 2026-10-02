@@ -275,6 +275,11 @@ created object, so removing a setting restores Keycloak's default instead of kee
 value. Three exceptions treat `null` as "leave as is": a client's protocol mappers, its scope
 assignments and its secret. A run with unchanged configuration sends no writes.
 
+Every provisioning call returns a `ProvisioningResult` listing what it added, updated or removed,
+with a diff for each update, so `hasChanges()` tells you whether a run changed anything. Each change
+is also logged at INFO. Not included: the writes that bootstrap the provisioning client when a
+connection is opened.
+
 > [!WARNING]
 > An incomplete list is destructive. Build the list from your own configuration every time — never
 > from what happens to be in the realm.
