@@ -43,14 +43,20 @@ public final class TestUserProvisioner {
    * Brings the realm's users to exactly {@code users}, matched by username: missing ones are
    * created, existing ones updated, and <strong>every other user in the realm is deleted</strong>.
    *
-   * <p>Credentials a user carries are applied on every run: Keycloak never returns their value, so
-   * there is no way to tell whether they still match.
+   * <p>A declared password is set again on every run, which restores one changed out of band:
+   * Keycloak never returns its value, so there is no way to tell whether it still matches. A
+   * temporary one therefore asks for a new password again after every run. Only passwords are
+   * supported, and not in a realm whose password policy forbids reusing one.
    *
    * <p>Usernames have to be lower-case — see {@link Usernames#requireLowerCase(String)}.
    */
   public void provisionUsers(List<UserRepresentation> users) {
     users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
     users.forEach(TestUserProvisioner::assertNoMembershipsAreDeclared);
+    users.forEach(TestUserProvisioner::assertOnlyPasswordsAreDeclared);
+    if (users.stream().anyMatch(TestUserProvisioner::declaresCredentials)) {
+      assertPasswordsCanBeSetAgain();
+    }
 
     List<UserRepresentation> existingUsers =
         users.stream()
@@ -59,11 +65,58 @@ public final class TestUserProvisioner {
             .toList();
 
     UserRepresentationDiffer differ = new UserRepresentationDiffer(existingUsers, users);
+    // A new user gets its password from the create request.
     differ.getElementsToAdd().forEach(this::addUser);
     differ.getElementsToUpdate().forEach(this::updateUser);
 
-    users.forEach(this::applyCredentials);
+    Set<String> createdUsernames =
+        differ.getElementsToAdd().stream()
+            .map(UserRepresentation::getUsername)
+            .collect(Collectors.toSet());
+    users.stream()
+        .filter(user -> !createdUsernames.contains(user.getUsername()))
+        .forEach(this::applyCredentials);
     removeUsersNotIn(users);
+  }
+
+  private static boolean declaresCredentials(UserRepresentation user) {
+    return user.getCredentials() != null && !user.getCredentials().isEmpty();
+  }
+
+  /** Keycloak's reset-password endpoint ignores the type and stores any value as the password. */
+  private static void assertOnlyPasswordsAreDeclared(UserRepresentation user) {
+    if (user.getCredentials() == null) {
+      return;
+    }
+    for (CredentialRepresentation credential : user.getCredentials()) {
+      if (!CredentialRepresentation.PASSWORD.equals(credential.getType())) {
+        throw new KeycloakException(
+            "User '"
+                + user.getUsername()
+                + "' declares a credential of type '"
+                + credential.getType()
+                + "'. Only passwords can be provisioned.");
+      }
+    }
+  }
+
+  /** Both reject a reset to the current password, so the next run could never set it again. */
+  private void assertPasswordsCanBeSetAgain() {
+    String passwordPolicy = realmManager.getRealmResource().toRepresentation().getPasswordPolicy();
+    if (passwordPolicy == null) {
+      return;
+    }
+    for (String policy : List.of("passwordHistory", "passwordAge")) {
+      if (passwordPolicy.contains(policy + "(")) {
+        throw new KeycloakException(
+            "Realm '"
+                + realmManager.getRealmName()
+                + "' has the password policy '"
+                + policy
+                + "', which forbids setting a password again. Remove it, or declare no passwords:"
+                + " provisioning sets every declared password again on each run.");
+      }
+    }
   }
 
   /**

@@ -503,8 +503,11 @@ seeded local setup.
 > account in the realm that is not in your list is deleted. Service accounts are unaffected, as
 > Keycloak keeps them out of the user listing.
 
-Credentials on a user are applied on every run rather than diffed. Keycloak never returns a
-credential's value, so there is no way to tell whether it still matches.
+A declared password is set again on every run rather than diffed, which also restores one changed
+in the admin console: Keycloak never returns its value, so there is no way to tell whether it still
+matches. A temporary password therefore asks for a new one after every run. Only passwords are
+supported, and provisioning refuses a realm whose password policy contains `passwordHistory` or
+`passwordAge`, as both reject setting the current password again.
 
 ## 📋 Requirements
 
