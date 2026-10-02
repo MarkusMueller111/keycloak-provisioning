@@ -270,6 +270,11 @@ you pass is reset, so repeated runs converge on your configuration. Objects Keyc
 of scope — the fences below are what keeps them that way — except for its built-in clients, which
 are reset to the configured default rather than deleted.
 
+The same holds within an object: a field you leave `null` gets the value Keycloak gives a freshly
+created object, so removing a setting restores Keycloak's default instead of keeping the last
+value. Three exceptions treat `null` as "leave as is": a client's protocol mappers, its scope
+assignments and its secret. A run with unchanged configuration sends no writes.
+
 > [!WARNING]
 > An incomplete list is destructive. Build the list from your own configuration every time — never
 > from what happens to be in the realm.

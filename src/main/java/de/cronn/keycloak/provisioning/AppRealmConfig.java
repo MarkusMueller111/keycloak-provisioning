@@ -83,7 +83,7 @@ public final class AppRealmConfig {
     return eventsEnabled;
   }
 
-  /** Null leaves Keycloak's own retention in place. */
+  /** Null means Keycloak's default: events never expire. */
   public Duration eventsExpiration() {
     return eventsExpiration;
   }
@@ -92,7 +92,7 @@ public final class AppRealmConfig {
     return adminEventsEnabled;
   }
 
-  /** Null leaves Keycloak's own retention in place. */
+  /** Null means Keycloak's default: admin events never expire. */
   public Duration adminEventsExpiration() {
     return adminEventsExpiration;
   }
@@ -105,6 +105,7 @@ public final class AppRealmConfig {
     return sessionMaxLifespan;
   }
 
+  /** Null means Keycloak's default of five minutes. */
   public Duration accessTokenLifespan() {
     return accessTokenLifespan;
   }

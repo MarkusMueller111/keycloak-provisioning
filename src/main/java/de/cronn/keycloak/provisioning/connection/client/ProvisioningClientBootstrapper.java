@@ -3,7 +3,7 @@ package de.cronn.keycloak.provisioning.connection.client;
 import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.master.MasterRealmProvisioner;
 import java.util.List;
-import java.util.Map;
+import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.slf4j.Logger;
@@ -37,7 +37,15 @@ public final class ProvisioningClientBootstrapper {
             .roles()
             .get(RealmManager.ADMIN_REALM_ROLE)
             .toRepresentation();
-    realmManager.getServiceAccountRealmRoleScope(client.getClientId()).add(List.of(adminRole));
+    RoleScopeResource serviceAccountRoles =
+        realmManager.getServiceAccountRealmRoleScope(client.getClientId());
+    boolean hasAdminRole =
+        serviceAccountRoles.listAll().stream()
+            .anyMatch(role -> role.getName().equals(adminRole.getName()));
+    if (hasAdminRole) {
+      return;
+    }
+    serviceAccountRoles.add(List.of(adminRole));
 
     log.info("Added admin role to service account for client '{}'", client.getClientId());
   }
@@ -52,12 +60,12 @@ public final class ProvisioningClientBootstrapper {
     client.setPublicClient(false);
     client.setStandardFlowEnabled(false);
     client.setDirectAccessGrantsEnabled(false);
-    // fullScopeAllowed stays true: the scope lists below are empty, so without it the service
-    // account's admin role never reaches the token and every call answers 403.
+    // The scope lists below are empty, so without full scope the service account's admin role
+    // never reaches the token and every call answers 403.
+    client.setFullScopeAllowed(true);
     client.setEnabled(true);
     client.setName(provisioningClientConfig.name());
     client.setDescription(provisioningClientConfig.description());
-    client.setAttributes(Map.of("realm_client", "false"));
     // A service account that never issues user tokens has no use for the realm's default scopes.
     client.setDefaultClientScopes(List.of());
     client.setOptionalClientScopes(List.of());

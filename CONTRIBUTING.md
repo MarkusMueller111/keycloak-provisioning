@@ -28,6 +28,15 @@ String newStateAsJson = toJson(targetElement);
 > and drift in it is never corrected — silently, while provisioning reports success. Add new fields
 > to the updater, and say why in a comment when you deliberately leave one out.
 
+A field the declaration leaves `null` is provisioned to the value Keycloak gives a freshly created
+object, so removing a declaration restores the default. Keycloak ignores `null` on update, so the
+updater has to send that default explicitly — `Declared` does this, and returns the server's own
+value when it is already equivalent, so an unchanged object produces no diff. The exceptions,
+where `null` means "leave as is": a client's protocol mappers, its scope assignments and its secret.
+
+Every provisioning method has a `sendsNoWritesWhenRerun…` test: `assertSendsNoWrites` records
+each write request at the HTTP level, including ones no differ reports.
+
 ### Adding a provisioning method
 
 1. Validate the whole desired list **before the first write**, so a contradiction cannot leave the
@@ -72,6 +81,14 @@ differently depending on where it is sent:
 - A client's *scope assignments* are ignored on its update as well, and need their own endpoints.
 - `searchByUsername(name, true)` is case-insensitive, but Keycloak stores usernames lower-cased.
 - An authentication execution's update honours only `requirement` and `priority`.
+- An update ignores every `null` field. A string is cleared only by sending `""`.
+- A client's attributes and flow-binding overrides are merged on update: a key left out keeps its
+  value, and one sent as `""` is removed. A client scope's attributes cannot be removed at all —
+  `""` is stored as `""`. A realm attribute left out of the update is removed.
+- A protocol mapper's update replaces its whole config, but creating one fills in
+  `introspection.token.claim` and `userinfo.token.claim` from `access.token.claim` and
+  `id.token.claim`.
+- A client created without web origins gets them derived from its redirect URIs.
 
 ## Tests
 

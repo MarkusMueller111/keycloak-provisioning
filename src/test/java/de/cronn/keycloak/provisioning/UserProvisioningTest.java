@@ -43,6 +43,22 @@ class UserProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
+  void restoresKeycloaksDefaultsWhenDeclarationsAreRemoved() {
+    UserRepresentation declared = user("alice");
+    declared.setFirstName("Alice");
+    declared.setEmailVerified(true);
+    declared.setRequiredActions(List.of("UPDATE_PASSWORD"));
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(declared)));
+
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+
+    UserRepresentation actual = findUser("alice");
+    assertThat(actual.getFirstName()).isNull();
+    assertThat(actual.isEmailVerified()).isFalse();
+    assertThat(actual.getRequiredActions()).isEmpty();
+  }
+
+  @Test
   void deletesUsersThatAreNoLongerConfigured() {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
 
@@ -52,25 +68,30 @@ class UserProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void updatesTheUserAgainWhenRerunUnchanged() {
+  void sendsNoWritesWhenRerunUnchanged() {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
 
     withTestUserProvisioner(
-        p ->
-            assertSendsOnlyWrites(
-                () -> p.provisionUsers(List.of(user("alice"))),
-                "PUT /admin/realms/test/users/<id>"));
+        p -> assertSendsNoWrites(() -> p.provisionUsers(List.of(user("alice")))));
   }
 
   @Test
-  void updatesTheUserAndResetsThePasswordWhenRerunWithAPassword() {
+  void sendsNoWritesWhenAUserDeclaringNoEnabledFlagIsRerun() {
+    UserRepresentation undeclared = user("alice");
+    undeclared.setEnabled(null);
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(undeclared)));
+
+    withTestUserProvisioner(p -> assertSendsNoWrites(() -> p.provisionUsers(List.of(undeclared))));
+  }
+
+  @Test
+  void sendsOnlyThePasswordResetWhenRerunWithAPassword() {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
 
     withTestUserProvisioner(
         p ->
             assertSendsOnlyWrites(
                 () -> p.provisionUsers(List.of(userWithPassword("alice"))),
-                "PUT /admin/realms/test/users/<id>",
                 "PUT /admin/realms/test/users/<id>/reset-password"));
   }
 

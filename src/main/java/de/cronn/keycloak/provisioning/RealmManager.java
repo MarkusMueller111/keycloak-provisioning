@@ -6,6 +6,7 @@ import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientScopeRepresentationDiffer;
+import de.cronn.keycloak.provisioning.differ.Declared;
 import de.cronn.keycloak.provisioning.differ.Differ;
 import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
@@ -252,7 +253,10 @@ public class RealmManager {
     provisionManagedClients(clients, existingClientsPredicate);
   }
 
-  /** Undeclared means off; Keycloak defaults {@code fullScopeAllowed} to {@code true}. */
+  /**
+   * Undeclared means off. Any other undeclared client field gets Keycloak's default, which for
+   * {@code fullScopeAllowed} is on.
+   */
   private static void applySecurityFlagDefaults(ClientRepresentation client) {
     if (client.isFullScopeAllowed() == null) {
       client.setFullScopeAllowed(false);
@@ -433,8 +437,9 @@ public class RealmManager {
   }
 
   /**
-   * A {@code null} mapper list means "not configured", an empty one removes every mapper. Keycloak
-   * returns mappers in its own order and with ids of its own, so they are matched by name.
+   * Same rule as the client scope assignments: a {@code null} list means "not declared" and is left
+   * alone, an empty one removes every mapper. Keycloak returns mappers in its own order and with
+   * ids of its own, so they are matched by name.
    */
   private void provisionClientProtocolMappers(List<ClientRepresentation> clients) {
     for (ClientRepresentation client : clients) {
@@ -482,9 +487,11 @@ public class RealmManager {
   }
 
   /**
-   * Keycloak ignores {@code defaultClientScopes} and {@code optionalClientScopes} when a client is
-   * updated, so they are assigned through their own endpoints once the clients themselves are in
-   * place. A {@code null} list means "leave as is"; an empty one removes every assignment.
+   * Keycloak drops {@code defaultClientScopes} and {@code optionalClientScopes} on the client
+   * update whatever they hold, so they are assigned through their own endpoints once the clients
+   * are in place. Unlike an undeclared client field, which gets Keycloak's default, a {@code null}
+   * list means "not declared" and is left alone, so assignments made outside this library survive.
+   * An empty list removes every assignment.
    */
   private void provisionClientScopeAssignments(List<ClientRepresentation> clients) {
     boolean anyScopesConfigured =
@@ -726,10 +733,28 @@ public class RealmManager {
         assertResponseIs201Created(response);
       }
     } else {
-      log.info(
-          "Updating authentication flow '{}' on Keycloak realm '{}'", flow.getAlias(), realmName);
-      getRealmResource().flows().updateFlow(existingFlow.get().getId(), flow);
+      updateFlowIfChanged(existingFlow.get(), flow);
     }
+  }
+
+  private void updateFlowIfChanged(
+      AuthenticationFlowRepresentation existingFlow, AuthenticationFlowRepresentation flow) {
+    String description = Declared.orUnset(flow.getDescription(), existingFlow.getDescription());
+    if (Objects.equals(description, existingFlow.getDescription())
+        && Objects.equals(flow.getProviderId(), existingFlow.getProviderId())
+        && Objects.equals(flow.isTopLevel(), existingFlow.isTopLevel())) {
+      return;
+    }
+
+    AuthenticationFlowRepresentation update = new AuthenticationFlowRepresentation();
+    update.setAlias(flow.getAlias());
+    update.setDescription(description);
+    update.setProviderId(flow.getProviderId());
+    update.setTopLevel(flow.isTopLevel());
+    update.setBuiltIn(flow.isBuiltIn());
+    log.info(
+        "Updating authentication flow '{}' on Keycloak realm '{}'", flow.getAlias(), realmName);
+    getRealmResource().flows().updateFlow(existingFlow.getId(), update);
   }
 
   private void deleteFlow(AuthenticationFlowRepresentation flow) {
@@ -897,6 +922,7 @@ public class RealmManager {
   public void provisionUserProfile(UserProfileConfig userProfileConfig) {
     UserProfileResource userProfileResource = getRealmResource().users().userProfile();
     UPConfig upConfig = userProfileResource.getConfiguration();
+    String before = AbstractDiffer.toJson(upConfig);
 
     ensureGroupsExist(upConfig, userProfileConfig.attributes());
 
@@ -927,7 +953,9 @@ public class RealmManager {
     upConfig.setAttributes(resultingAttributes);
 
     userProfileConfig.userProfileCustomizer().accept(upConfig);
-    userProfileResource.update(upConfig);
+    if (!before.equals(AbstractDiffer.toJson(upConfig))) {
+      userProfileResource.update(upConfig);
+    }
   }
 
   private static void ensureGroupsExist(

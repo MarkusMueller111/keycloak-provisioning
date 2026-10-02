@@ -104,6 +104,31 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
         .containsEntry("adminEventsExpiration", String.valueOf(Duration.ofDays(5).toSeconds()));
   }
 
+  /** The realm SharedKeycloakTest creates declares nothing, so it carries Keycloak's defaults. */
+  @Test
+  void assumesKeycloaksDefaultAccessTokenLifespan() {
+    assertThat(adminClient().realm(REALM).toRepresentation().getAccessTokenLifespan())
+        .isEqualTo(AppRealmProvisioner.DEFAULT_ACCESS_TOKEN_LIFESPAN_SECONDS);
+  }
+
+  @Test
+  void restoresKeycloaksDefaultsWhenSettingsAreNoLongerDeclared() {
+    provision(
+        AppRealmConfig.builder(APP_REALM)
+            .accessTokenLifespan(Duration.ofMinutes(3))
+            .eventsExpiration(Duration.ofDays(3))
+            .adminEventsExpiration(Duration.ofDays(5))
+            .build());
+
+    provision(AppRealmConfig.builder(APP_REALM).build());
+
+    RealmRepresentation realm = findRealm();
+    assertThat(realm.getAccessTokenLifespan())
+        .isEqualTo(AppRealmProvisioner.DEFAULT_ACCESS_TOKEN_LIFESPAN_SECONDS);
+    assertThat(realm.getEventsExpiration()).isNull();
+    assertThat(realm.getAttributes()).doesNotContainKey("adminEventsExpiration");
+  }
+
   @Test
   void appliesTheSecurityHeaders() {
     provision(AppRealmConfig.builder(APP_REALM).build());
