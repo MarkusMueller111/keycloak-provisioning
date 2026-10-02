@@ -49,6 +49,22 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
     }
   }
 
+  @Test
+  void updatesTheUserProfileAgainWhenRerunUnchanged() {
+    UserProfileConfig config =
+        UserProfileConfig.builder()
+            .attributes(List.of(UserProfileConfig.AttributeConfig.builder("department").build()))
+            .withoutBuiltInAttributes(KeycloakProvidedUserAttribute.LAST_NAME)
+            .build();
+    withRealmManager(realmManager -> realmManager.provisionUserProfile(config));
+
+    withRealmManager(
+        realmManager ->
+            assertSendsOnlyWrites(
+                () -> realmManager.provisionUserProfile(config),
+                "PUT /admin/realms/test/users/profile"));
+  }
+
   private void removeAttributeDirectly(String attributeName) {
     var resource = adminClient().realm(REALM).users().userProfile();
     UPConfig config = resource.getConfiguration();

@@ -52,13 +52,26 @@ class UserProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void isIdempotent() {
-    UserRepresentation alice = user("alice");
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(alice)));
-
+  void updatesTheUserAgainWhenRerunUnchanged() {
     withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
 
-    assertThat(usernames()).containsOnlyOnce("alice");
+    withTestUserProvisioner(
+        p ->
+            assertSendsOnlyWrites(
+                () -> p.provisionUsers(List.of(user("alice"))),
+                "PUT /admin/realms/test/users/<id>"));
+  }
+
+  @Test
+  void updatesTheUserAndResetsThePasswordWhenRerunWithAPassword() {
+    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+
+    withTestUserProvisioner(
+        p ->
+            assertSendsOnlyWrites(
+                () -> p.provisionUsers(List.of(userWithPassword("alice"))),
+                "PUT /admin/realms/test/users/<id>",
+                "PUT /admin/realms/test/users/<id>/reset-password"));
   }
 
   /** Keycloak never returns a credential value, so it is applied rather than diffed. */
@@ -142,6 +155,12 @@ class UserProvisioningTest extends SharedKeycloakTest {
     user.setUsername(username);
     user.setEnabled(true);
     user.setEmail(username + "@example.com");
+    return user;
+  }
+
+  private static UserRepresentation userWithPassword(String username) {
+    UserRepresentation user = user(username);
+    user.setCredentials(List.of(password("Str0ng-P4ssw0rd!")));
     return user;
   }
 

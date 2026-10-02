@@ -259,6 +259,27 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(executionProviderIds(FLOW)).isEmpty();
   }
 
+  @Test
+  void updatesTheFlowAgainWhenRerunUnchanged() {
+    withRealmManager(this::provisionFlowWithExecutions);
+
+    withRealmManager(
+        realmManager ->
+            assertSendsOnlyWrites(
+                () -> provisionFlowWithExecutions(realmManager),
+                "PUT /admin/realms/test/authentication/flows/<id>"));
+  }
+
+  private void provisionFlowWithExecutions(RealmManager realmManager) {
+    realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+    realmManager.provisionExecutions(
+        Map.of(
+            FLOW,
+            List.of(
+                execution("auth-cookie"),
+                new FlowExecution.SubFlow("nested", "a nested flow", null))));
+  }
+
   private static AuthenticationFlowRepresentation flow(String alias, String description) {
     AuthenticationFlowRepresentation flow = new AuthenticationFlowRepresentation();
     flow.setAlias(alias);

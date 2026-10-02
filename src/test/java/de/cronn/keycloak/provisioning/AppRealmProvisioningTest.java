@@ -130,15 +130,14 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     assertThat(realm.getLoginTheme()).isEqualTo("keycloak");
   }
 
-  /** Provisioning runs on every start, so re-running must converge rather than churn. */
   @Test
-  void isIdempotent() {
+  void sendsNoWritesWhenRerunUnchanged() {
     AppRealmConfig config = AppRealmConfig.builder(APP_REALM).displayName("Stable").build();
     provision(config);
 
-    provision(config);
-
-    assertThat(findRealm().getDisplayName()).isEqualTo("Stable");
+    withAppRealmManager(
+        realmManager ->
+            assertSendsNoWrites(() -> new AppRealmProvisioner(realmManager, config).provision()));
   }
 
   @Test

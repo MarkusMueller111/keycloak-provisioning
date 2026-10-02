@@ -117,6 +117,23 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
    * admins then removes the only account left.
    */
   @Test
+  void updatesTheRealmAndUserProfileAgainWhenRerunUnchanged() {
+    MasterRealmConfig config =
+        configBuilder(
+                new PermanentAdmin.Standard(
+                    "permanent-admin", "Str0ng-P4ssw0rd!", "admin@example.com"))
+            .build();
+    provision(config);
+
+    withMaster(
+        realmManager ->
+            assertSendsOnlyWrites(
+                () -> new MasterRealmProvisioner(realmManager, config).provision(),
+                "PUT /admin/realms/master",
+                "PUT /admin/realms/master/users/profile"));
+  }
+
+  @Test
   void rejectsAPermanentAdminNamedLikeATemporaryOne() {
     assertThatThrownBy(
             () ->

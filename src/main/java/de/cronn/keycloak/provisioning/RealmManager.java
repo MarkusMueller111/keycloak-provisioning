@@ -369,7 +369,7 @@ public class RealmManager {
    * and are never touched, which matters because deleting {@code profile} or {@code roles} strips
    * claims from every token in the realm while login keeps working.
    *
-   * <p>A scope's own update drops its protocol mappers, so those are provisioned separately. A
+   * <p>A scope's own update ignores its protocol mappers, so those are provisioned separately. A
    * {@code null} mapper list on a scope leaves its mappers alone.
    */
   public void provisionManagedClientScopes(List<ClientScopeRepresentation> clientScopes) {

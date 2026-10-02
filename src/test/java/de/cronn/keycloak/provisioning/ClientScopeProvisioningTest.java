@@ -44,7 +44,7 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
     assertThat(scopeNames()).contains("profile", "email", "roles", "offline_access");
   }
 
-  /** A scope's own update drops its mappers, so they need a pass of their own. */
+  /** A scope's own update ignores its mappers, so they need a pass of their own. */
   @Test
   void provisionsTheMappersOfAManagedScope() {
     ClientScopeRepresentation withMappers = scope("system-a");
@@ -60,18 +60,32 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void isIdempotent() {
+  void updatesTheScopeAndItsMapperAgainWhenRerunUnchanged() {
+    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())));
+
+    withRealmManager(
+        rm ->
+            assertSendsOnlyWrites(
+                () -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())),
+                "PUT /admin/realms/test/client-scopes/<id>",
+                "PUT /admin/realms/test/client-scopes/<id>/protocol-mappers/models/<id>"));
+  }
+
+  @Test
+  void updatesTheScopeAgainWhenRerunWithoutMappers() {
+    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scopeWithMapper())));
+
+    withRealmManager(
+        rm ->
+            assertSendsOnlyWrites(
+                () -> rm.provisionManagedClientScopes(List.of(scope("system-a"))),
+                "PUT /admin/realms/test/client-scopes/<id>"));
+  }
+
+  private static ClientScopeRepresentation scopeWithMapper() {
     ClientScopeRepresentation scope = scope("system-a");
     scope.setProtocolMappers(List.of(hardcodedClaim("kept")));
-    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(scope)));
-    String idBefore = findScope("system-a").getId();
-
-    ClientScopeRepresentation again = scope("system-a");
-    again.setProtocolMappers(List.of(hardcodedClaim("kept")));
-    withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(again)));
-
-    assertThat(findScope("system-a").getId()).isEqualTo(idBefore);
-    assertThat(mapperNames("system-a")).containsExactly("kept");
+    return scope;
   }
 
   private static ClientScopeRepresentation scope(String name) {

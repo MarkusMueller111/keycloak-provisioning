@@ -64,6 +64,17 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
   }
 
   @Test
+  void rewritesTheProvisioningClientWhenReconnecting() {
+    connectionManager().close();
+
+    assertSendsOnlyWrites(
+        () -> connectionManager().close(),
+        "PUT /admin/realms/master/clients/<id>",
+        "DELETE /admin/realms/master/clients/<id>/default-client-scopes/<id>",
+        "POST /admin/realms/master/users/<id>/role-mappings/realm");
+  }
+
+  @Test
   void grantsTheAdminRoleToTheProvisioningServiceAccount() {
     try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
       RealmManager master = connectionManager.realmManager("master");
