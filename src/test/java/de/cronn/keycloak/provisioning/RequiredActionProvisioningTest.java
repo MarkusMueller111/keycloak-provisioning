@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import de.cronn.keycloak.provisioning.AuthenticationManagementConfig.RequiredAction;
@@ -19,6 +20,52 @@ class RequiredActionProvisioningTest extends SharedKeycloakTest {
                   RequiredAction.of(KeycloakProvidedRequiredAction.UPDATE_PASSWORD, true, false),
                   RequiredAction.of(KeycloakProvidedRequiredAction.VERIFY_EMAIL, true, true)))
           .build();
+
+  /** A typo in a later entry must not leave the ones before it registered. */
+  @Test
+  void writesNothingWhenAProviderIdIsUnknown() {
+    AuthenticationManagementConfig withTypo =
+        AuthenticationManagementConfig.builder()
+            .requiredActions(
+                List.of(
+                    RequiredAction.of(KeycloakProvidedRequiredAction.UPDATE_PASSWORD, true, false),
+                    new RequiredAction("NO_SUCH_ACTION", "Typo", true, false)))
+            .build();
+
+    withRealmManager(
+        rm ->
+            assertThatThrownBy(
+                    () ->
+                        rm.getAuthenticationManagementManager().provisionRequiredActions(withTypo))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("NO_SUCH_ACTION"));
+
+    withRealmManager(rm -> assertThat(requiredActionIds(rm)).contains("CONFIGURE_TOTP"));
+  }
+
+  @Test
+  void rejectsTheSameRequiredActionTwice() {
+    AuthenticationManagementConfig twice =
+        AuthenticationManagementConfig.builder()
+            .requiredActions(
+                List.of(
+                    RequiredAction.of(KeycloakProvidedRequiredAction.VERIFY_EMAIL, true, false),
+                    RequiredAction.of(KeycloakProvidedRequiredAction.VERIFY_EMAIL, false, false)))
+            .build();
+
+    withRealmManager(
+        rm ->
+            assertThatThrownBy(
+                    () -> rm.getAuthenticationManagementManager().provisionRequiredActions(twice))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("more than once"));
+  }
+
+  private static List<String> requiredActionIds(RealmManager realmManager) {
+    return realmManager.getRealmResource().flows().getRequiredActions().stream()
+        .map(RequiredActionProviderRepresentation::getProviderId)
+        .toList();
+  }
 
   @Test
   void removesTheRequiredActionsThatAreNotConfigured() {

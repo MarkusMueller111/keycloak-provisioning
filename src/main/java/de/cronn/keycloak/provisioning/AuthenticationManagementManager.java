@@ -3,10 +3,14 @@ package de.cronn.keycloak.provisioning;
 import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.Differ;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.resource.AuthenticationManagementResource;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.representations.idm.RequiredActionProviderRepresentation;
@@ -36,6 +40,8 @@ public class AuthenticationManagementManager {
     if (requiredActions.isEmpty()) {
       return ProvisioningResult.none();
     }
+    assertRequiredActionsExist(authentication, requiredActions);
+
     Changes changes = new Changes(log, realm.toRepresentation().getRealm());
     registerUnregisteredActions(authentication, requiredActions, changes);
 
@@ -55,6 +61,35 @@ public class AuthenticationManagementManager {
       authentication.removeRequiredAction(unmanaged.getAlias());
     }
     return changes.result();
+  }
+
+  /**
+   * Before the first write: a provider id Keycloak does not know would otherwise only fail once the
+   * actions before it had been registered and updated.
+   */
+  private static void assertRequiredActionsExist(
+      AuthenticationManagementResource authentication,
+      List<AuthenticationManagementConfig.RequiredAction> requiredActions) {
+    Set<String> known =
+        Stream.concat(
+                authentication.getRequiredActions().stream()
+                    .map(RequiredActionProviderRepresentation::getProviderId),
+                authentication.getUnregisteredRequiredActions().stream()
+                    .map(RequiredActionProviderSimpleRepresentation::getProviderId))
+            .collect(Collectors.toSet());
+
+    Set<String> declared = new LinkedHashSet<>();
+    for (AuthenticationManagementConfig.RequiredAction requiredAction : requiredActions) {
+      String providerId = requiredAction.providerId();
+      Validate.isTrue(
+          declared.add(providerId),
+          "Required action '%s' is configured more than once",
+          providerId);
+      Validate.isTrue(
+          known.contains(providerId),
+          "Required action '%s' is not a provider this Keycloak offers",
+          providerId);
+    }
   }
 
   private void registerUnregisteredActions(
