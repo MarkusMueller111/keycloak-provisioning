@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -188,6 +189,7 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
             .accessTokenLifespan(Duration.ofMinutes(3))
             .eventsExpiration(Duration.ofDays(3))
             .adminEventsExpiration(Duration.ofDays(5))
+            .securityHeaders(Map.of(SecurityHeader.X_FRAME_OPTIONS, "DENY"))
             .build());
 
     provision(AppRealmConfig.builder(APP_REALM).build());
@@ -198,14 +200,22 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     assertThat(realm.getEventsExpiration()).isEqualTo(Duration.ofDays(90).toSeconds());
     assertThat(realm.getAttributes())
         .containsEntry("adminEventsExpiration", String.valueOf(Duration.ofDays(7).toSeconds()));
+    assertThat(realm.getBrowserSecurityHeaders())
+        .containsEntry(SecurityHeader.X_FRAME_OPTIONS.getKeycloakName(), "SAMEORIGIN");
   }
 
   @Test
-  void appliesTheSecurityHeaders() {
-    provision(AppRealmConfig.builder(APP_REALM).build());
+  void mergesDeclaredSecurityHeadersOverTheDefaults() {
+    provision(
+        AppRealmConfig.builder(APP_REALM)
+            .securityHeaders(Map.of(SecurityHeader.X_FRAME_OPTIONS, "DENY"))
+            .build());
 
     assertThat(findRealm().getBrowserSecurityHeaders())
-        .containsEntry(SecurityHeader.X_FRAME_OPTIONS.getKeycloakName(), "SAMEORIGIN");
+        .containsEntry(SecurityHeader.X_FRAME_OPTIONS.getKeycloakName(), "DENY")
+        .containsEntry(
+            SecurityHeader.CONTENT_SECURITY_POLICY.getKeycloakName(),
+            SecurityHeader.DEFAULT_VALUES.get(SecurityHeader.CONTENT_SECURITY_POLICY));
   }
 
   /** The customizer runs last, so it can reach settings the config does not model. */

@@ -1,5 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
+import java.util.Collections;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.keycloak.representations.idm.RealmRepresentation;
@@ -30,6 +32,19 @@ public enum SecurityHeader {
   }
 
   private final String keycloakName;
+
+  /**
+   * Every header gets a value, so one that is no longer declared returns to its default rather than
+   * keeping whatever it was last set to.
+   */
+  public static Map<SecurityHeader, String> mergeOverDefaults(
+      Map<SecurityHeader, String> declared) {
+    Map<SecurityHeader, String> merged = new EnumMap<>(DEFAULT_VALUES);
+    if (declared != null) {
+      merged.putAll(declared);
+    }
+    return Collections.unmodifiableMap(merged);
+  }
 
   /** Writes {@code headers} into the representation, leaving any other header Keycloak set. */
   public static void applyTo(
