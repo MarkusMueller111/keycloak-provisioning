@@ -648,6 +648,20 @@ class ClientProvisioningTest extends SharedKeycloakTest {
         .getConfig();
   }
 
+  @Test
+  void hardensAnUnmanagedClientLikeAManagedOne() {
+    ClientRepresentation wildcard = client("app-wild");
+    wildcard.setRedirectUris(List.of("https://app.example.com/*"));
+
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(wildcard)))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("redirect URI");
+
+    withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(client("app-scoped")));
+
+    assertThat(findClient("app-scoped").isFullScopeAllowed()).isFalse();
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);

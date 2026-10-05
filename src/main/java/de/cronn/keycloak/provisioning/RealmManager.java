@@ -317,6 +317,8 @@ public class RealmManager {
         "Client '%s' carries the managed prefix '%s' and belongs in provisionManagedClients",
         clientId,
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
+    assertRedirectUrisAreNotWildcards(client);
+    applySecurityFlagDefaults(client);
     return provisionManagedClients(
         List.of(client), existing -> clientId.equals(existing.getClientId()));
   }
