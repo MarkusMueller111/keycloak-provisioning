@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.keycloak.representations.userprofile.config.UPAttribute;
 import org.keycloak.representations.userprofile.config.UPConfig;
@@ -38,6 +39,36 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
 
     assertThat(attributeNames())
         .contains("username", "email", "firstName", "lastName", "department");
+  }
+
+  @Test
+  void letsOnlyAdminsEditACustomAttributeUnlessEditableBySaysOtherwise() {
+    withRealmManager(
+        realmManager ->
+            realmManager.provisionUserProfile(
+                UserProfileConfig.builder()
+                    .attributes(
+                        List.of(
+                            UserProfileConfig.AttributeConfig.builder("department").build(),
+                            UserProfileConfig.AttributeConfig.builder("phone")
+                                .requiredFor(Set.of(UserProfileConfig.UserProfileRole.USER))
+                                .build(),
+                            UserProfileConfig.AttributeConfig.builder("nickname")
+                                .editableBy(
+                                    Set.of(
+                                        UserProfileConfig.UserProfileRole.ADMIN,
+                                        UserProfileConfig.UserProfileRole.USER))
+                                .build()))
+                    .build()));
+
+    assertThat(attribute("department").getPermissions().getEdit()).containsExactly("admin");
+    assertThat(attribute("department").getPermissions().getView())
+        .containsExactlyInAnyOrder("admin", "user");
+    assertThat(attribute("phone").getPermissions().getEdit()).containsExactly("admin");
+    assertThat(attribute("nickname").getPermissions().getEdit())
+        .containsExactlyInAnyOrder("admin", "user");
+    assertThat(attribute("firstName").getPermissions().getEdit())
+        .containsExactlyInAnyOrder("admin", "user");
   }
 
   @Test
@@ -86,6 +117,10 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
             .filter(attribute -> !attribute.getName().equals(attributeName))
             .toList());
     resource.update(config);
+  }
+
+  private UPAttribute attribute(String name) {
+    return adminClient().realm(REALM).users().userProfile().getConfiguration().getAttribute(name);
   }
 
   private List<String> attributeNames() {

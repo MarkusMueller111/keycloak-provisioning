@@ -90,9 +90,14 @@ public final class UserProfileConfig {
    * may view/edit it, and which validation rules apply.
    *
    * <p>Defaults if not set via {@link Builder}: {@code displayName} falls back to {@code
-   * attributeName}; {@code requiredFor} defaults to nobody (not required); {@code viewableBy}/
-   * {@code editableBy} default to every {@link UserProfileRole} (viewable/editable by everyone);
-   * {@code validationRules} defaults to none; {@code group} defaults to {@code null} (no group).
+   * attributeName}; {@code requiredFor} defaults to nobody (not required); {@code viewableBy}
+   * defaults to every {@link UserProfileRole}; {@code editableBy} defaults to admins only; {@code
+   * validationRules} defaults to none; {@code group} defaults to {@code null} (no group).
+   *
+   * <p>A user can change an attribute they may edit in the account console, so an attribute that
+   * reaches a token and is used for authorization must not be user-editable. An attribute users
+   * fill in themselves needs {@code editableBy} set: Keycloak accepts one that is required for
+   * users but not editable by them, and only rejects it when a user opens their profile.
    */
   public record AttributeConfig(
       String attributeName,
@@ -110,8 +115,7 @@ public final class UserProfileConfig {
       requiredFor = requiredFor == null || requiredFor.isEmpty() ? null : Set.copyOf(requiredFor);
       viewableBy =
           viewableBy == null ? EnumSet.allOf(UserProfileRole.class) : Set.copyOf(viewableBy);
-      editableBy =
-          editableBy == null ? EnumSet.allOf(UserProfileRole.class) : Set.copyOf(editableBy);
+      editableBy = editableBy == null ? EnumSet.of(UserProfileRole.ADMIN) : Set.copyOf(editableBy);
       validationRules = validationRules == null ? List.of() : List.copyOf(validationRules);
     }
 
@@ -122,6 +126,7 @@ public final class UserProfileConfig {
     public static Builder defaultUsernameBuilder() {
       return builder("username")
           .displayName("${username}")
+          .editableBy(EnumSet.allOf(UserProfileRole.class))
           .validationRules(
               List.of(
                   new ValidationRule.Length(3, 255),
@@ -133,6 +138,7 @@ public final class UserProfileConfig {
       return builder("email")
           .displayName("${email}")
           .requiredFor(EnumSet.allOf(UserProfileRole.class))
+          .editableBy(EnumSet.allOf(UserProfileRole.class))
           .validationRules(
               List.of(
                   new ValidationRule.Custom("email", Map.of()),
@@ -142,6 +148,7 @@ public final class UserProfileConfig {
     public static Builder defaultFirstNameBuilder() {
       return builder("firstName")
           .displayName("${firstName}")
+          .editableBy(EnumSet.allOf(UserProfileRole.class))
           .validationRules(
               List.of(
                   new ValidationRule.Length(null, 255),
@@ -151,6 +158,7 @@ public final class UserProfileConfig {
     public static Builder defaultLastNameBuilder() {
       return builder("lastName")
           .displayName("${lastName}")
+          .editableBy(EnumSet.allOf(UserProfileRole.class))
           .validationRules(
               List.of(
                   new ValidationRule.Length(null, 255),
