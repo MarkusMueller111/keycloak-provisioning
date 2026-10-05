@@ -56,6 +56,14 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
               key -> false,
               key -> ""));
       target.setProtocol(orDefault(source.getProtocol(), target.getProtocol(), "openid-connect"));
+      target.setAlwaysDisplayInConsole(
+          orDefault(source.isAlwaysDisplayInConsole(), target.isAlwaysDisplayInConsole(), false));
+      target.setSurrogateAuthRequired(
+          orDefault(source.isSurrogateAuthRequired(), target.isSurrogateAuthRequired(), false));
+      target.setNodeReRegistrationTimeout(
+          orDefault(
+              source.getNodeReRegistrationTimeout(), target.getNodeReRegistrationTimeout(), -1));
+      target.setType(orUnset(source.getType(), target.getType()));
       target.setFrontchannelLogout(
           orDefault(source.isFrontchannelLogout(), target.isFrontchannelLogout(), false));
       target.setRedirectUris(
@@ -78,6 +86,8 @@ public class ClientRepresentationDiffer extends AbstractDiffer<ClientRepresentat
       target.setEnabled(orDefault(source.isEnabled(), target.isEnabled(), true));
       // Scope assignments are left out on purpose: Keycloak ignores them on the client update,
       // so RealmManager provisions them through the dedicated endpoints afterwards.
+      // authorizationSettings is left out as well: an object graph with ids of its own, it needs a
+      // pass of its own like the client scopes.
       // So are protocol mappers: Keycloak returns them with ids and in its own order, so
       // RealmManager provisions them by name afterwards. authorizationSettings is not modelled.
     };
