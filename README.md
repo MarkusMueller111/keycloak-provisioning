@@ -416,8 +416,9 @@ so a token leaked from a low-value application still asserts whatever else that 
 client.setFullScopeAllowed(true);
 ```
 
-Wildcard redirect URIs and web origins are rejected: a wildcard lets any URI under it receive the
-authorization code, so anyone who can host content there can complete the flow.
+Wildcard redirect URIs, post-logout redirect URIs and web origins are rejected: a wildcard lets any
+URI under it receive the authorization code, so anyone who can host content there can complete the
+flow.
 
 ### 🎫 Client scopes
 
