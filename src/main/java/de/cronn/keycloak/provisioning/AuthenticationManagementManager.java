@@ -29,7 +29,7 @@ public class AuthenticationManagementManager {
     this.realm = Objects.requireNonNull(realm);
   }
 
-  public ProvisioningResult configure(AuthenticationManagementConfig config) {
+  public ProvisioningResult provisionRequiredActions(AuthenticationManagementConfig config) {
     AuthenticationManagementResource authentication = realm.flows();
 
     List<AuthenticationManagementConfig.RequiredAction> requiredActions = config.requiredActions();

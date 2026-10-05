@@ -362,10 +362,44 @@ public class RealmManager {
             + " (an empty list assigns none) or neither (Keycloak's defaults apply).");
   }
 
+  /**
+   * Before the first write: a name that does not match a scope in the realm would otherwise only
+   * surface once the clients had been added, deleted and updated. Names are case-sensitive.
+   */
+  private void assertDeclaredClientScopesExist(List<ClientRepresentation> clients) {
+    Set<String> declared =
+        clients.stream()
+            .flatMap(
+                client ->
+                    Stream.concat(
+                        client.getDefaultClientScopes() == null
+                            ? Stream.empty()
+                            : client.getDefaultClientScopes().stream(),
+                        client.getOptionalClientScopes() == null
+                            ? Stream.empty()
+                            : client.getOptionalClientScopes().stream()))
+            .collect(Collectors.toCollection(LinkedHashSet::new));
+    if (declared.isEmpty()) {
+      return;
+    }
+
+    Set<String> existing =
+        getRealmResource().clientScopes().findAll().stream()
+            .map(ClientScopeRepresentation::getName)
+            .collect(Collectors.toSet());
+    for (String name : declared) {
+      if (!existing.contains(name)) {
+        throw new KeycloakException(
+            "Cannot assign client scope '" + name + "': no such client scope in the realm");
+      }
+    }
+  }
+
   private ProvisioningResult provisionManagedClients(
       List<ClientRepresentation> clients,
       Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
     Changes changes = changes();
+    assertDeclaredClientScopesExist(clients);
     List<ClientRepresentation> existingClients =
         getRealmResource().clients().findAll().stream()
             .filter(existingClientsToConsiderPredicate)

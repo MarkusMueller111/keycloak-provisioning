@@ -241,13 +241,19 @@ class ClientProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void failsOnAClientScopeThatDoesNotExist() {
-    ClientRepresentation client = client("system-a");
-    client.setDefaultClientScopes(List.of("no-such-scope"));
-    client.setOptionalClientScopes(List.of());
+    ClientRepresentation withBadScope = client("system-a");
+    withBadScope.setDefaultClientScopes(List.of("no-such-scope"));
+    withBadScope.setOptionalClientScopes(List.of());
 
-    assertThatThrownBy(() -> withRealmManager(rm -> rm.provisionManagedClients(List.of(client))))
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    rm -> rm.provisionManagedClients(List.of(client("system-b"), withBadScope))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("no-such-scope");
+
+    // Rejected before the first write, so the other client in the same call is untouched.
+    assertThat(clientIds()).doesNotContain("system-a", "system-b");
   }
 
   @Test
