@@ -7,12 +7,15 @@ public class AuthenticationExecutionRepresentationDiffer
     extends AbstractDiffer<AuthenticationExecutionInfoRepresentation> {
 
   /**
-   * The only two fields an execution update writes. Everything else on the representation is either
-   * server-derived or identity, and is silently ignored: {@code level}, {@code index}, {@code
-   * flowId}, {@code configurable} and {@code requirementChoices} are computed from the flow tree,
-   * {@code displayName} and {@code description} come from the authenticator provider, and {@code
-   * providerId} and {@code alias} identify the execution rather than configure it. Setting {@code
-   * authenticationFlow} on a plain execution answers 404.
+   * What an execution update writes. Everything else on the representation is either server-derived
+   * or identity, and is silently ignored: {@code level}, {@code index}, {@code flowId}, {@code
+   * configurable} and {@code requirementChoices} are computed from the flow tree, {@code
+   * displayName} names the authenticator or the nested flow, and {@code providerId} and {@code
+   * alias} identify the execution rather than configure it. Setting {@code authenticationFlow} on a
+   * plain execution answers 404.
+   *
+   * <p>{@code description} is written for a sub-flow, where it belongs to the nested flow, but not
+   * for an authenticator, where it comes from the provider.
    *
    * <p>Order follows {@code priority}; Keycloak recomputes {@code index} from it on read. The
    * representation's {@code id} selects which execution is written, so it must stay the one read
@@ -23,6 +26,9 @@ public class AuthenticationExecutionRepresentationDiffer
     return (target, source) -> {
       target.setRequirement(source.getRequirement());
       target.setPriority(source.getPriority());
+      if (target.getAuthenticationFlow() == Boolean.TRUE) {
+        target.setDescription(source.getDescription());
+      }
     };
   }
 

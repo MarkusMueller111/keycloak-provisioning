@@ -164,6 +164,35 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(executionProviderIds(FLOW)).isEmpty();
   }
 
+  /**
+   * Keycloak writes a sub-flow's description through the execution update, unlike an
+   * authenticator's.
+   */
+  @Test
+  void updatesTheDescriptionOfASubFlow() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+          realmManager.provisionExecutions(
+              Map.of(
+                  FLOW,
+                  List.of(
+                      new FlowExecution.SubFlow(
+                          "nested", "first", FlowExecution.Requirement.ALTERNATIVE))));
+        });
+
+    withRealmManager(
+        realmManager ->
+            realmManager.provisionExecutions(
+                Map.of(
+                    FLOW,
+                    List.of(
+                        new FlowExecution.SubFlow(
+                            "nested", "second", FlowExecution.Requirement.ALTERNATIVE)))));
+
+    assertThat(executionDescriptions(FLOW)).containsExactly("second");
+  }
+
   /** The documented shape: only the top-level flow is declared, the sub-flow entry creates it. */
   @Test
   void createsASubFlowWithoutItBeingDeclaredAsAFlow() {
@@ -349,6 +378,12 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   private List<String> executionProviderIds(String flowAlias) {
     return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
         .map(AuthenticationExecutionInfoRepresentation::getProviderId)
+        .toList();
+  }
+
+  private List<String> executionDescriptions(String flowAlias) {
+    return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
+        .map(AuthenticationExecutionInfoRepresentation::getDescription)
         .toList();
   }
 
