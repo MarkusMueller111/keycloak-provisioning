@@ -24,7 +24,10 @@ class RequiredActionProvisioningTest extends SharedKeycloakTest {
   void removesTheRequiredActionsThatAreNotConfigured() {
     withRealmManager(
         rm ->
-            assertThat(rm.getAuthenticationManagementManager().configure(CONFIG).changes())
+            assertThat(
+                    rm.getAuthenticationManagementManager()
+                        .provisionRequiredActions(CONFIG)
+                        .changes())
                 .extracting(Change::target, Change::name, Change::type)
                 .contains(tuple(Target.REQUIRED_ACTION, "TERMS_AND_CONDITIONS", Type.REMOVED)));
 
@@ -33,11 +36,13 @@ class RequiredActionProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void sendsNoWritesWhenRerunUnchanged() {
-    withRealmManager(rm -> rm.getAuthenticationManagementManager().configure(CONFIG));
+    withRealmManager(
+        rm -> rm.getAuthenticationManagementManager().provisionRequiredActions(CONFIG));
 
     withRealmManager(
         rm ->
-            assertChangesNothing(() -> rm.getAuthenticationManagementManager().configure(CONFIG)));
+            assertChangesNothing(
+                () -> rm.getAuthenticationManagementManager().provisionRequiredActions(CONFIG)));
   }
 
   private List<String> requiredActionAliases() {

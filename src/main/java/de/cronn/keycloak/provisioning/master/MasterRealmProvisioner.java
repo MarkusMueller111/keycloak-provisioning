@@ -167,7 +167,7 @@ public class MasterRealmProvisioner {
   private ProvisioningResult configureRequiredActions() {
     return realmManager
         .getAuthenticationManagementManager()
-        .configure(config.authenticationManagement());
+        .provisionRequiredActions(config.authenticationManagement());
   }
 
   private static void setAttribute(
