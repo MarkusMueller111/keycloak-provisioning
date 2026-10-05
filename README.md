@@ -279,7 +279,9 @@ are reset to the configured default rather than deleted.
 The same holds within an object: a field you leave `null` gets the value Keycloak gives a freshly
 created object, so removing a setting restores Keycloak's default instead of keeping the last
 value. Three exceptions treat `null` as "leave as is": a client's protocol mappers, its scope
-assignments and its secret. A run with unchanged configuration sends no writes.
+assignments and its secret. A run with unchanged configuration sends no writes, with two
+exceptions: a declared fixture password is set again every time, and SMTP with a password is
+rewritten every time, because Keycloak returns the password masked so it can never match.
 
 Every provisioning call returns a `ProvisioningResult` listing what it added, updated or removed,
 with a diff for each update, so `hasChanges()` tells you whether a run changed anything. Each change
