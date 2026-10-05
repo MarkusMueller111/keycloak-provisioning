@@ -13,8 +13,8 @@ import org.keycloak.representations.idm.RealmRepresentation;
  * own, and their order differs per project, so they are applied by calling {@link RealmManager}
  * afterwards.
  *
- * <p>Must run before anything else touches the realm — {@link RealmManager#createOrUpdateRealm}
- * also refreshes the token, which no other call does.
+ * <p>Must run before anything else touches the realm: creating it also refreshes the access token,
+ * which was issued before the realm existed and does not cover it yet.
  */
 public class AppRealmProvisioner {
 

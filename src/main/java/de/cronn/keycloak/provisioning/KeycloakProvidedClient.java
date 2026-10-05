@@ -1,7 +1,5 @@
 package de.cronn.keycloak.provisioning;
 
-import java.util.List;
-
 /** Clients Keycloak creates in every realm itself. */
 public enum KeycloakProvidedClient {
   ACCOUNT("account"),
@@ -13,8 +11,6 @@ public enum KeycloakProvidedClient {
   ;
 
   /** Ordered, since it ends up in a LinkedHashSet that reaches log output. */
-  public static final List<KeycloakProvidedClient> DISABLED_BY_DEFAULT = List.of(BROKER);
-
   private final String clientId;
 
   KeycloakProvidedClient(String clientId) {
