@@ -146,6 +146,49 @@ class FlowProvisioningTest extends SharedKeycloakTest {
     assertThat(flowAliases()).contains(FLOW).doesNotContain("made-in-the-console");
   }
 
+  /** A duplicate anywhere in the map is rejected before the first flow is written. */
+  @Test
+  void writesNothingWhenALaterFlowDeclaresADuplicate() {
+    withRealmManager(
+        realmManager ->
+            realmManager.provisionFlows(
+                List.of(flow(FLOW, "a test flow"), flow("second", "another flow"))));
+
+    Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
+    executions.put(FLOW, List.of(execution("auth-cookie")));
+    executions.put("second", List.of(execution("auth-otp-form"), execution("auth-otp-form")));
+
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.provisionExecutions(executions)))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    assertThat(executionProviderIds(FLOW)).isEmpty();
+  }
+
+  /** The documented shape: only the top-level flow is declared, the sub-flow entry creates it. */
+  @Test
+  void createsASubFlowWithoutItBeingDeclaredAsAFlow() {
+    withRealmManager(
+        realmManager -> {
+          realmManager.provisionFlows(List.of(flow(FLOW, "a test flow")));
+
+          Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
+          executions.put(
+              FLOW,
+              List.of(
+                  execution("auth-cookie"),
+                  new FlowExecution.SubFlow(
+                      "nested-forms",
+                      "username and password",
+                      FlowExecution.Requirement.ALTERNATIVE)));
+          executions.put("nested-forms", List.of(execution("auth-username-password-form")));
+          realmManager.provisionExecutions(executions);
+        });
+
+    // getFlows() lists only top-level flows, so the nested one shows up through its executions.
+    assertThat(executionProviderIds("nested-forms")).containsExactly("auth-username-password-form");
+    assertThat(executionDisplayNames(FLOW)).contains("nested-forms");
+  }
+
   /** Keycloak appends a new execution, so its declared position only holds if we write it back. */
   @Test
   void placesANewExecutionAtItsDeclaredPosition() {
@@ -306,6 +349,12 @@ class FlowProvisioningTest extends SharedKeycloakTest {
   private List<String> executionProviderIds(String flowAlias) {
     return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
         .map(AuthenticationExecutionInfoRepresentation::getProviderId)
+        .toList();
+  }
+
+  private List<String> executionDisplayNames(String flowAlias) {
+    return adminClient().realm(REALM).flows().getExecutions(flowAlias).stream()
+        .map(AuthenticationExecutionInfoRepresentation::getDisplayName)
         .toList();
   }
 

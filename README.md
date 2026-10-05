@@ -301,7 +301,7 @@ connection is opened.
 the flow each belongs to:
 
 ```java
-realmManager.provisionFlows(List.of(browserFlow, formsSubFlow));
+realmManager.provisionFlows(List.of(browserFlow));
 
 Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
 executions.put("my-browser-flow", List.of(
@@ -318,6 +318,10 @@ Entries are applied in iteration order, and a sub-flow only exists once the entr
 has run — so use an ordered map and name a flow before the entry that fills it. `Map.of` iterates in
 an unspecified order and will fail with a 404 on some runs and not others.
 
+> [!IMPORTANT]
+> Only top-level flows go to `provisionFlows`. A `SubFlow` entry creates the nested flow itself, so
+> declaring it in both places fails with an HTTP 409.
+
 The order you declare executions in is the order they run in. An execution keeps its identity across
 runs, so reordering moves it rather than recreating it.
 
@@ -326,7 +330,7 @@ authenticator cannot appear twice in one flow — there would be nothing to tell
 next run. Keycloak permits it; `provisionExecutions` rejects it before writing anything.
 
 `FlowExecution` is a sealed type: an `Authenticator` names a provider id, a `SubFlow` names a flow
-that has to exist in its own right. It deliberately carries only what an execution update can
+that the entry creates. It deliberately carries only what an execution update can
 actually write — the requirement and the position. Everything else Keycloak either derives from the
 flow tree or takes from the authenticator, so there is no customizer here; reach for
 `getRealmResource()` if you need more.

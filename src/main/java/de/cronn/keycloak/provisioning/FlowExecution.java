@@ -28,7 +28,10 @@ public sealed interface FlowExecution {
     }
   }
 
-  /** A nested flow, which has to exist as a flow of its own. */
+  /**
+   * A nested flow, created by the entry that declares it — do not declare it to {@code
+   * provisionFlows} as well, which would conflict.
+   */
   record SubFlow(String alias, String description, Requirement requirement)
       implements FlowExecution {
 
