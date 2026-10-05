@@ -131,6 +131,29 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
                 () -> new MasterRealmProvisioner(realmManager, config).provision()));
   }
 
+  /**
+   * An in-cluster relay often needs no credentials, which Keycloak stores without the user keys.
+   */
+  @Test
+  void configuresAnSmtpRelayThatNeedsNoCredentials() {
+    MasterRealmConfig config =
+        configBuilder(PermanentAdmin.none())
+            .smtp(
+                new MasterRealmConfig.Smtp(
+                    "keycloak@example.com", "smtp.example.com", 25, false, false, null, null))
+            .build();
+    provision(config);
+
+    assertThat(masterRealm().getSmtpServer())
+        .containsEntry("auth", "false")
+        .doesNotContainKeys("user", "password");
+
+    withMaster(
+        realmManager ->
+            assertChangesNothing(
+                () -> new MasterRealmProvisioner(realmManager, config).provision()));
+  }
+
   @Test
   void removesTheSmtpServerWhenItIsNoLongerDeclared() {
     provision(

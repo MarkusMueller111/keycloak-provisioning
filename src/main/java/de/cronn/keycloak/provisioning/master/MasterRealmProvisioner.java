@@ -183,22 +183,18 @@ public class MasterRealmProvisioner {
   }
 
   private static Map<String, String> mapSmtpServer(MasterRealmConfig.Smtp smtp) {
-    return Map.of(
-        "from",
-        smtp.from(),
-        "host",
-        smtp.host(),
-        "port",
-        String.valueOf(smtp.port()),
-        "auth",
-        "true",
-        "ssl",
-        String.valueOf(smtp.sslEnabled()),
-        "starttls",
-        String.valueOf(smtp.startTls()),
-        "user",
-        smtp.username(),
-        "password",
-        smtp.password());
+    Map<String, String> smtpServer = new LinkedHashMap<>();
+    smtpServer.put("from", smtp.from());
+    smtpServer.put("host", smtp.host());
+    smtpServer.put("port", String.valueOf(smtp.port()));
+    smtpServer.put("ssl", String.valueOf(smtp.sslEnabled()));
+    smtpServer.put("starttls", String.valueOf(smtp.startTls()));
+    // Keycloak stores a relay that needs no credentials without the user and password keys.
+    smtpServer.put("auth", String.valueOf(smtp.username() != null));
+    if (smtp.username() != null) {
+      smtpServer.put("user", smtp.username());
+      smtpServer.put("password", smtp.password());
+    }
+    return smtpServer;
   }
 }
