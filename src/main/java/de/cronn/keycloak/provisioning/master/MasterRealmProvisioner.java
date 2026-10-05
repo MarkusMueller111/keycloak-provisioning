@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Provisions the Keycloak <em>master</em> realm: realm-level settings (SMTP, password policy,
- * session lifetimes, security headers), and disabling of unused built-in clients.
+ * session lifetimes, security headers), and its built-in clients.
  *
  * <p>The caller owns the {@link Keycloak} connection (authentication, retries, lifecycle) and hands
  * it in; this class only touches the master realm. Defaults live in {@link MasterRealmConfig} and
