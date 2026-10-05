@@ -63,6 +63,33 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     assertThat(appClient("account").isStandardFlowEnabled()).isFalse();
   }
 
+  /** The same guards as the master realm: silently collapsing a duplicate would hide a mistake. */
+  @Test
+  void rejectsTheBuiltInClientsTheMasterRealmRejects() {
+    assertThatThrownBy(
+            () ->
+                AppRealmConfig.builder(APP_REALM)
+                    .builtInClients(
+                        List.of(
+                            BuiltInClientConfig.forClient(KeycloakProvidedClient.BROKER).build(),
+                            BuiltInClientConfig.forClient(KeycloakProvidedClient.BROKER).build()))
+                    .build())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("more than once");
+
+    assertThatThrownBy(
+            () ->
+                AppRealmConfig.builder(APP_REALM)
+                    .builtInClients(
+                        List.of(
+                            BuiltInClientConfig.forClient(KeycloakProvidedClient.REALM_MANAGEMENT)
+                                .enabled(false)
+                                .build()))
+                    .build())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("realm-management");
+  }
+
   @Test
   void letsAnAppRealmKeepABuiltInClient() {
     provision(

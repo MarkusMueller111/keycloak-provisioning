@@ -2,7 +2,6 @@ package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.AuthenticationManagementConfig;
 import de.cronn.keycloak.provisioning.BuiltInClientConfig;
-import de.cronn.keycloak.provisioning.KeycloakProvidedClient;
 import de.cronn.keycloak.provisioning.KeycloakProvidedRequiredAction;
 import de.cronn.keycloak.provisioning.PasswordPolicy;
 import de.cronn.keycloak.provisioning.SecurityHeader;
@@ -11,7 +10,6 @@ import de.cronn.keycloak.provisioning.UserProfileConfig;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -61,7 +59,7 @@ public final class MasterRealmConfig {
         builder.securityHeaders == null
             ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
             : Map.copyOf(builder.securityHeaders);
-    this.builtInClients = mergeOverDefaults(builder.builtInClients);
+    this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
     this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
     this.adminEventsExpiration =
         builder.adminEventsExpiration == null ? Duration.ofDays(7) : builder.adminEventsExpiration;
@@ -111,35 +109,6 @@ public final class MasterRealmConfig {
             + " on first login, but authenticationManagement() does not enable the UPDATE_PASSWORD"
             + " required action. Required actions missing from that list are unregistered, which"
             + " would silently keep the initial password in place forever.");
-  }
-
-  private static List<BuiltInClientConfig> mergeOverDefaults(List<BuiltInClientConfig> configured) {
-    assertBuiltInClientsAreValid(configured);
-    Map<KeycloakProvidedClient, BuiltInClientConfig> merged = new LinkedHashMap<>();
-    BuiltInClientConfig.BUILT_IN_CLIENT_DEFAULTS.forEach(
-        config -> merged.put(config.client(), config));
-    if (configured != null) {
-      configured.forEach(config -> merged.put(config.client(), config));
-    }
-    return List.copyOf(merged.values());
-  }
-
-  private static void assertBuiltInClientsAreValid(List<BuiltInClientConfig> configured) {
-    if (configured == null) {
-      return;
-    }
-    Set<KeycloakProvidedClient> seen = new LinkedHashSet<>();
-    for (BuiltInClientConfig config : configured) {
-      Validate.isTrue(
-          seen.add(config.client()),
-          "Client '%s' is configured more than once",
-          config.client().getClientId());
-      // Keycloak answers a disable with 403, so this would fail mid-provisioning instead.
-      Validate.isTrue(
-          config.client() != KeycloakProvidedClient.REALM_MANAGEMENT || config.enabled(),
-          "Client '%s' cannot be disabled: it backs the realm's admin permissions",
-          config.client().getClientId());
-    }
   }
 
   /** Default role composites unless overridden via {@link Builder#defaultRoleComposites}. */
