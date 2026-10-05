@@ -369,6 +369,12 @@ UserProfileConfig.builder()
     .build();
 ```
 
+A declared attribute is editable by admins only until you say otherwise with `editableBy`. Users
+can change any attribute they may edit in the account console, so one that reaches a token and is
+used for authorization has to stay admin-only. Give `editableBy` every role for an attribute users
+fill in themselves — Keycloak accepts one that is required for users but not editable by them, and
+only rejects it when a user opens their profile.
+
 `withoutBuiltInAttributes` drops a built-in rather than overriding it. Only `firstName` and
 `lastName` can go — Keycloak answers a profile without `username` or `email` with HTTP 400, and
 `build()` rejects the attempt.
