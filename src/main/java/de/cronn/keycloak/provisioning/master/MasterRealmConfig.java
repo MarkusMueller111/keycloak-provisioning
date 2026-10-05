@@ -246,6 +246,9 @@ public final class MasterRealmConfig {
     return realmCustomizer;
   }
 
+  /**
+   * Leave both {@code username} and {@code password} null for a relay that needs no credentials.
+   */
   public record Smtp(
       String from,
       String host,
@@ -253,7 +256,16 @@ public final class MasterRealmConfig {
       boolean sslEnabled,
       boolean startTls,
       String username,
-      String password) {}
+      String password) {
+
+    public Smtp {
+      Validate.notBlank(from, "from must not be blank");
+      Validate.notBlank(host, "host must not be blank");
+      Validate.isTrue(
+          (username == null) == (password == null),
+          "username and password have to be given together, or neither");
+    }
+  }
 
   public static final class Builder {
     private final String frontendUrl;

@@ -80,6 +80,16 @@ class MasterRealmConfigTest {
   }
 
   @Test
+  void rejectsHalfOfTheSmtpCredentials() {
+    assertThatThrownBy(
+            () ->
+                new MasterRealmConfig.Smtp(
+                    "a@example.com", "smtp.example.com", 25, false, false, "user", null))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("together");
+  }
+
+  @Test
   void rejectsTheSameClientTwice() {
     assertThatThrownBy(
             () ->
