@@ -13,8 +13,13 @@ public record AuthenticationManagementConfig(List<RequiredAction> requiredAction
     this(builder.requiredActions);
   }
 
-  /** No required actions are configured */
-  public static AuthenticationManagementConfig disabled() {
+  /**
+   * Leaves the realm's required actions as they are. An empty list means "not declared" here rather
+   * than "remove them all", which is the one place this library departs from that convention:
+   * Keycloak registers required actions of its own, and the alternative would unregister {@code
+   * VERIFY_EMAIL} and friends for every realm that never configured any.
+   */
+  public static AuthenticationManagementConfig notConfigured() {
     return builder().build();
   }
 

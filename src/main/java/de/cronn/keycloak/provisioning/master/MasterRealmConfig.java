@@ -74,7 +74,7 @@ public final class MasterRealmConfig {
         builder.userProfile == null ? UserProfileConfig.builder().build() : builder.userProfile;
     this.authenticationManagement =
         builder.authenticationManagement == null
-            ? AuthenticationManagementConfig.disabled()
+            ? AuthenticationManagementConfig.notConfigured()
             : builder.authenticationManagement;
     this.realmCustomizer = builder.realmCustomizer == null ? realm -> {} : builder.realmCustomizer;
     validate();
@@ -231,7 +231,8 @@ public final class MasterRealmConfig {
   }
 
   /**
-   * Required action configuration. Defaults to {@link AuthenticationManagementConfig#disabled()}.
+   * Required action configuration. Defaults to {@link
+   * AuthenticationManagementConfig#notConfigured()}.
    */
   public AuthenticationManagementConfig authenticationManagement() {
     return authenticationManagement;
