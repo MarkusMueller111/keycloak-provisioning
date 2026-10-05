@@ -10,6 +10,22 @@ import org.keycloak.representations.userprofile.config.UPConfig;
 
 class UserProfileProvisioningTest extends SharedKeycloakTest {
 
+  /** An attribute added over REST may carry no permissions, which the diff has to tolerate. */
+  @Test
+  void toleratesAnExistingAttributeWithoutPermissions() {
+    UPConfig upConfig = adminClient().realm(REALM).users().userProfile().getConfiguration();
+    UPAttribute bare = new UPAttribute();
+    bare.setName("bareAttr");
+    bare.setDisplayName("Bare");
+    upConfig.getAttributes().add(bare);
+    adminClient().realm(REALM).users().userProfile().update(upConfig);
+
+    withRealmManager(
+        realmManager -> realmManager.provisionUserProfile(UserProfileConfig.builder().build()));
+
+    assertThat(attributeNames()).doesNotContain("bareAttr");
+  }
+
   @Test
   void keepsTheBuiltInAttributesWhenACustomOneIsDeclared() {
     withRealmManager(
