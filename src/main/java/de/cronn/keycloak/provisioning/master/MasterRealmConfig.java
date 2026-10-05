@@ -2,6 +2,7 @@ package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.AuthenticationManagementConfig;
 import de.cronn.keycloak.provisioning.BuiltInClientConfig;
+import de.cronn.keycloak.provisioning.EventRetention;
 import de.cronn.keycloak.provisioning.KeycloakProvidedRequiredAction;
 import de.cronn.keycloak.provisioning.PasswordPolicy;
 import de.cronn.keycloak.provisioning.SecurityHeader;
@@ -37,6 +38,7 @@ public final class MasterRealmConfig {
   private final Map<SecurityHeader, String> securityHeaders;
   private final List<BuiltInClientConfig> builtInClients;
   private final boolean deleteTemporaryAdminUsers;
+  private final Duration eventsExpiration;
   private final Duration adminEventsExpiration;
   private final Set<String> defaultRoleComposites;
   private final UserProfileConfig userProfile;
@@ -61,8 +63,14 @@ public final class MasterRealmConfig {
             : Map.copyOf(builder.securityHeaders);
     this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
     this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
+    this.eventsExpiration =
+        builder.eventsExpiration == null
+            ? EventRetention.DEFAULT_EVENTS_EXPIRATION
+            : builder.eventsExpiration;
     this.adminEventsExpiration =
-        builder.adminEventsExpiration == null ? Duration.ofDays(7) : builder.adminEventsExpiration;
+        builder.adminEventsExpiration == null
+            ? EventRetention.DEFAULT_ADMIN_EVENTS_EXPIRATION
+            : builder.adminEventsExpiration;
     this.defaultRoleComposites =
         unmodifiableOrdered(
             builder.defaultRoleComposites == null
@@ -178,6 +186,13 @@ public final class MasterRealmConfig {
   }
 
   /**
+   * @see Builder#eventsExpiration
+   */
+  public Duration eventsExpiration() {
+    return eventsExpiration;
+  }
+
+  /**
    * @see Builder#adminEventsExpiration
    */
   public Duration adminEventsExpiration() {
@@ -248,6 +263,7 @@ public final class MasterRealmConfig {
     private Map<SecurityHeader, String> securityHeaders;
     private List<BuiltInClientConfig> builtInClients;
     private boolean deleteTemporaryAdminUsers = true;
+    private Duration eventsExpiration;
     private Duration adminEventsExpiration;
     private Set<String> defaultRoleComposites;
     private UserProfileConfig userProfile;
@@ -324,7 +340,13 @@ public final class MasterRealmConfig {
       return this;
     }
 
-    /** How long admin events are retained before Keycloak expires them. */
+    /** Defaults to 90 days; {@link Duration#ZERO} keeps login events forever. */
+    public Builder eventsExpiration(Duration eventsExpiration) {
+      this.eventsExpiration = eventsExpiration;
+      return this;
+    }
+
+    /** Defaults to 7 days; {@link Duration#ZERO} keeps admin events forever. */
     public Builder adminEventsExpiration(Duration adminEventsExpiration) {
       this.adminEventsExpiration = adminEventsExpiration;
       return this;

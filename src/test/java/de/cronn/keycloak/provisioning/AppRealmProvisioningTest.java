@@ -37,6 +37,9 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     assertThat(realm.getPasswordPolicy()).isEqualTo(PasswordPolicy.DEFAULT);
     assertThat(realm.getSsoSessionIdleTimeout()).isEqualTo(300);
     assertThat(realm.getSsoSessionMaxLifespan()).isEqualTo(3600);
+    assertThat(realm.getEventsExpiration()).isEqualTo(Duration.ofDays(90).toSeconds());
+    assertThat(realm.getAttributes())
+        .containsEntry("adminEventsExpiration", String.valueOf(Duration.ofDays(7).toSeconds()));
   }
 
   @Test
@@ -166,7 +169,20 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void restoresKeycloaksDefaultsWhenSettingsAreNoLongerDeclared() {
+  void keepsEventsForeverWhenTheExpirationIsZero() {
+    provision(
+        AppRealmConfig.builder(APP_REALM)
+            .eventsExpiration(Duration.ZERO)
+            .adminEventsExpiration(Duration.ZERO)
+            .build());
+
+    RealmRepresentation realm = findRealm();
+    assertThat(realm.getEventsExpiration()).isNull();
+    assertThat(realm.getAttributes()).doesNotContainKey("adminEventsExpiration");
+  }
+
+  @Test
+  void restoresTheDefaultsWhenSettingsAreNoLongerDeclared() {
     provision(
         AppRealmConfig.builder(APP_REALM)
             .accessTokenLifespan(Duration.ofMinutes(3))
@@ -179,8 +195,9 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     RealmRepresentation realm = findRealm();
     assertThat(realm.getAccessTokenLifespan())
         .isEqualTo(AppRealmProvisioner.DEFAULT_ACCESS_TOKEN_LIFESPAN_SECONDS);
-    assertThat(realm.getEventsExpiration()).isNull();
-    assertThat(realm.getAttributes()).doesNotContainKey("adminEventsExpiration");
+    assertThat(realm.getEventsExpiration()).isEqualTo(Duration.ofDays(90).toSeconds());
+    assertThat(realm.getAttributes())
+        .containsEntry("adminEventsExpiration", String.valueOf(Duration.ofDays(7).toSeconds()));
   }
 
   @Test

@@ -156,10 +156,10 @@ new AppRealmProvisioner(realmManager, config).provision();
 ```
 
 It hardens what Keycloak leaves open rather than copying its defaults: the same password policy and
-session limits as the master realm, brute-force protection, events, security headers, and the same
-treatment of Keycloak's built-in clients — `admin-cli` and `broker` disabled. Anything not modelled
-(locales, login theme, SMTP, WebAuthn) goes through `realmCustomizer`, which runs last and can
-override the rest.
+session limits as the master realm, brute-force protection, login events kept for 90 days and admin
+events for 7, security headers, and the same treatment of Keycloak's built-in clients —
+`admin-cli` and `broker` disabled. Anything not modelled (locales, login theme, SMTP, WebAuthn)
+goes through `realmCustomizer`, which runs last and can override the rest.
 
 > [!IMPORTANT]
 > The session defaults log an end user out after 5 idle minutes, with a 1 hour cap. That suits an
@@ -196,9 +196,10 @@ new MasterRealmProvisioner(realmManager, config).provision();
 
 The defaults include a password policy (`length(12) and notContainsUsername and upperCase(1) and
 lowerCase(1) and digits(1) and specialChars(1) and maxAuthAge(0)`), a 5-minute session idle
-timeout with a 1-hour maximum lifespan, brute-force protection, security headers, a 7-day
-admin-event expiration, and a user profile that requires an email address. Every one of them is a
-builder method away — override what does not fit and leave the rest.
+timeout with a 1-hour maximum lifespan, brute-force protection, security headers, login events kept
+for 90 days and admin events for 7, and a user profile that requires an email address. Every one
+of them is a builder method away — override what does not fit and leave the rest. An event
+expiration of `Duration.ZERO` keeps events forever.
 
 ### 🔑 Permanent admin
 

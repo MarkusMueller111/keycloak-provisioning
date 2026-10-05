@@ -2,8 +2,6 @@ package de.cronn.keycloak.provisioning;
 
 import de.cronn.keycloak.provisioning.differ.Declared;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Objects;
 import org.keycloak.representations.idm.RealmRepresentation;
 
@@ -60,24 +58,7 @@ public class AppRealmProvisioner {
     realm.setBruteForceProtected(config.bruteForceProtected());
     realm.setEventsEnabled(config.eventsEnabled());
     realm.setAdminEventsEnabled(config.adminEventsEnabled());
-
-    // Keycloak stores 0 as no expiry and returns it as null.
-    Long eventsExpiration =
-        Declared.orDefault(
-            config.eventsExpiration() == null ? null : config.eventsExpiration().toSeconds(),
-            realm.getEventsExpiration(),
-            0L);
-    if (eventsExpiration != null) {
-      realm.setEventsExpiration(eventsExpiration);
-    }
-    // Admin event retention has no setter of its own; Keycloak keeps it as a realm attribute, and
-    // drops an attribute left out of the update.
-    setAttribute(
-        realm,
-        "adminEventsExpiration",
-        config.adminEventsExpiration() == null
-            ? null
-            : String.valueOf(config.adminEventsExpiration().toSeconds()));
+    EventRetention.applyTo(realm, config.eventsExpiration(), config.adminEventsExpiration());
     realm.setSsoSessionIdleTimeout(toSecondsInt(config.sessionIdleTimeout()));
     realm.setSsoSessionMaxLifespan(toSecondsInt(config.sessionMaxLifespan()));
     realm.setAccessTokenLifespan(
@@ -95,20 +76,5 @@ public class AppRealmProvisioner {
 
   private static int toSecondsInt(Duration duration) {
     return Math.toIntExact(duration.toSeconds());
-  }
-
-  /** {@code null} removes the attribute. */
-  private static void setAttribute(RealmRepresentation realm, String key, String value) {
-    Map<String, String> current = realm.getAttributes() == null ? Map.of() : realm.getAttributes();
-    if (Objects.equals(current.get(key), value)) {
-      return;
-    }
-    Map<String, String> attributes = new LinkedHashMap<>(current);
-    if (value == null) {
-      attributes.remove(key);
-    } else {
-      attributes.put(key, value);
-    }
-    realm.setAttributes(attributes);
   }
 }
