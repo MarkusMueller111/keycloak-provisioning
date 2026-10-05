@@ -92,17 +92,27 @@ public class AbstractDiffer<T> {
     return inBoth;
   }
 
+  /** A detached copy, so a caller's representation is never written to. */
+  public static <T> T copyOf(T value, Class<T> type) {
+    try {
+      return objectMapper().readValue(objectMapper().writeValueAsString(value), type);
+    } catch (JsonProcessingException e) {
+      throw new KeycloakException("JSON copy failed", e);
+    }
+  }
+
+  private static ObjectMapper objectMapper() {
+    return JsonMapper.builder()
+        .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
+        .configure(SerializationFeature.INDENT_OUTPUT, true)
+        // Jackson 3's default; set explicitly so diffs survive the move back to it.
+        .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
+        .build();
+  }
+
   public static String toJson(Object value) {
     try {
-      ObjectMapper objectMapper =
-          JsonMapper.builder()
-              .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
-              .configure(SerializationFeature.INDENT_OUTPUT, true)
-              // Jackson 3's default; set explicitly so diffs survive the move back to it.
-              .enable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
-              .build();
-
-      return objectMapper.writeValueAsString(value);
+      return objectMapper().writeValueAsString(value);
     } catch (JsonProcessingException e) {
       throw new KeycloakException("JSON serialization failed", e);
     }

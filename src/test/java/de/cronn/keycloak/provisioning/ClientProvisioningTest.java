@@ -668,6 +668,18 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("app-scoped").isFullScopeAllowed()).isFalse();
   }
 
+  /** A caller may reuse its representation, so provisioning must not write to it. */
+  @Test
+  void leavesTheCallersRepresentationAlone() {
+    ClientRepresentation declared = client("system-a");
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(declared)));
+
+    assertThat(declared.isFullScopeAllowed()).isNull();
+    assertThat(declared.isImplicitFlowEnabled()).isNull();
+    assertThat(findClient("system-a").isFullScopeAllowed()).isFalse();
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);

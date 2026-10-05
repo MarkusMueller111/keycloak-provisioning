@@ -256,28 +256,31 @@ public class RealmManager {
     clients.forEach(this::assertClientIsManaged);
     clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
     clients.forEach(RealmManager::assertRedirectUrisAreNotWildcards);
-    clients.forEach(RealmManager::applySecurityFlagDefaults);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
-    return provisionManagedClients(clients, existingClientsPredicate);
+    return provisionManagedClients(withSecurityFlagDefaults(clients), existingClientsPredicate);
   }
 
   /**
    * Undeclared means off. Any other undeclared client field gets Keycloak's default, which for
-   * {@code fullScopeAllowed} is on.
+   * {@code fullScopeAllowed} is on. Applied to copies: the caller's representations are theirs, and
+   * a client created from one would otherwise carry Keycloak's default instead.
    */
-  private static void applySecurityFlagDefaults(ClientRepresentation client) {
-    if (client.isFullScopeAllowed() == null) {
-      client.setFullScopeAllowed(false);
-    }
-    if (client.isImplicitFlowEnabled() == null) {
-      client.setImplicitFlowEnabled(false);
-    }
-    if (client.isBearerOnly() == null) {
-      client.setBearerOnly(false);
-    }
-    if (client.isConsentRequired() == null) {
-      client.setConsentRequired(false);
-    }
+  private static List<ClientRepresentation> withSecurityFlagDefaults(
+      List<ClientRepresentation> clients) {
+    return clients.stream().map(RealmManager::withSecurityFlagDefaults).toList();
+  }
+
+  private static ClientRepresentation withSecurityFlagDefaults(ClientRepresentation client) {
+    ClientRepresentation copy = AbstractDiffer.copyOf(client, ClientRepresentation.class);
+    copy.setFullScopeAllowed(orFalse(copy.isFullScopeAllowed()));
+    copy.setImplicitFlowEnabled(orFalse(copy.isImplicitFlowEnabled()));
+    copy.setBearerOnly(orFalse(copy.isBearerOnly()));
+    copy.setConsentRequired(orFalse(copy.isConsentRequired()));
+    return copy;
+  }
+
+  private static Boolean orFalse(Boolean declared) {
+    return declared != null ? declared : Boolean.FALSE;
   }
 
   /** A wildcard lets any URI under it receive the authorization code. Keycloak accepts them. */
@@ -318,9 +321,9 @@ public class RealmManager {
         clientId,
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
     assertRedirectUrisAreNotWildcards(client);
-    applySecurityFlagDefaults(client);
     return provisionManagedClients(
-        List.of(client), existing -> clientId.equals(existing.getClientId()));
+        List.of(withSecurityFlagDefaults(client)),
+        existing -> clientId.equals(existing.getClientId()));
   }
 
   /**
@@ -435,15 +438,15 @@ public class RealmManager {
     ClientScopeRepresentationDiffer differ =
         new ClientScopeRepresentationDiffer(existingScopes, clientScopes);
 
-    for (ClientScopeRepresentation scope : differ.getElementsToDelete()) {
-      changes.removed(Target.CLIENT_SCOPE, scope.getName());
-      scopesResource.get(scope.getId()).remove();
-    }
     for (ClientScopeRepresentation scope : differ.getElementsToAdd()) {
       changes.added(Target.CLIENT_SCOPE, scope.getName());
       try (Response response = scopesResource.create(scope)) {
         assertResponseIs201Created(response);
       }
+    }
+    for (ClientScopeRepresentation scope : differ.getElementsToDelete()) {
+      changes.removed(Target.CLIENT_SCOPE, scope.getName());
+      scopesResource.get(scope.getId()).remove();
     }
     for (ToUpdate<ClientScopeRepresentation> update : differ.getElementsToUpdate()) {
       ClientScopeRepresentation scope = update.newState();
