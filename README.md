@@ -267,7 +267,13 @@ ERROR: Failed to start server in (nonserver) mode
 
 Note that `notContainsUsername` rejects a password containing the username regardless of its
 length or complexity. Once logged in, issues can be fixed. E.g. `admin-cli` can be re-enabled in
-the admin console for renewed bootstrapping or credentials for the permanent admin ca be reset.
+the admin console for renewed bootstrapping or credentials for the permanent admin can be reset.
+
+> [!NOTE]
+> The same applies when rotating the provisioning client's secret. If connecting with the new
+> secret fails, the fallback authenticates through `admin-cli` and the bootstrap admin — both of
+> which a hardened realm has disabled and deleted. Re-enable `admin-cli` first, or change the
+> secret in the admin console to match your configuration.
 
 ## ♻️ Provisioning
 
@@ -282,6 +288,10 @@ value. Three exceptions treat `null` as "leave as is": a client's protocol mappe
 assignments and its secret. A run with unchanged configuration sends no writes, with two
 exceptions: a declared fixture password is set again every time, and SMTP with a password is
 rewritten every time, because Keycloak returns the password masked so it can never match.
+
+> [!IMPORTANT]
+> Nothing coordinates concurrent runs. Two instances provisioning the same realm at once will race —
+> conflicting writes, interleaved deletes — so run provisioning as a single job, or under a lock.
 
 Every provisioning call returns a `ProvisioningResult` listing what it added, updated or removed,
 with a diff for each update, so `hasChanges()` tells you whether a run changed anything. Each change
