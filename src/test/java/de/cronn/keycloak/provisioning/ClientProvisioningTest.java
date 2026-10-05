@@ -680,6 +680,43 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("system-a").isFullScopeAllowed()).isFalse();
   }
 
+  @Test
+  void revertsTheRemainingClientFieldsChangedOutOfBand() {
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    ClientRepresentation drifted = findClient("system-a");
+    drifted.setAlwaysDisplayInConsole(true);
+    drifted.setSurrogateAuthRequired(true);
+    drifted.setNodeReRegistrationTimeout(120);
+    drifted.setType("drifted-type");
+    clientResource("system-a").update(drifted);
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(client("system-a"))));
+
+    ClientRepresentation actual = findClient("system-a");
+    assertThat(actual.isAlwaysDisplayInConsole()).isFalse();
+    assertThat(actual.isSurrogateAuthRequired()).isFalse();
+    assertThat(actual.getNodeReRegistrationTimeout()).isEqualTo(-1);
+    assertThat(actual.getType()).isNull();
+  }
+
+  @Test
+  void appliesTheRemainingClientFieldsWhenDeclared() {
+    ClientRepresentation declared = client("system-a");
+    declared.setAlwaysDisplayInConsole(true);
+    declared.setSurrogateAuthRequired(true);
+    declared.setNodeReRegistrationTimeout(120);
+    declared.setType("my-type");
+
+    withRealmManager(rm -> rm.provisionManagedClients(List.of(declared)));
+
+    ClientRepresentation actual = findClient("system-a");
+    assertThat(actual.isAlwaysDisplayInConsole()).isTrue();
+    assertThat(actual.isSurrogateAuthRequired()).isTrue();
+    assertThat(actual.getNodeReRegistrationTimeout()).isEqualTo(120);
+    assertThat(actual.getType()).isEqualTo("my-type");
+  }
+
   private static ClientRepresentation client(String clientId) {
     ClientRepresentation client = new ClientRepresentation();
     client.setClientId(clientId);
