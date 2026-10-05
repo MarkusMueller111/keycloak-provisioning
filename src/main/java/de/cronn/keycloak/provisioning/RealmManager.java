@@ -70,6 +70,8 @@ public class RealmManager {
 
   public static final String ADMIN_REALM_ROLE = "admin";
 
+  private static final String POST_LOGOUT_REDIRECT_URIS_ATTRIBUTE = "post.logout.redirect.uris";
+
   protected final Keycloak keycloak;
   protected final String realmName;
   private final ManagedNaming clientNaming;
@@ -168,15 +170,9 @@ public class RealmManager {
    */
   public ProvisioningResult provisionBuiltInClients(
       Collection<BuiltInClientConfig> builtInClients) {
+    BuiltInClientConfig.validate(builtInClients);
     Map<KeycloakProvidedClient, BuiltInClientConfig> byClient = new LinkedHashMap<>();
-    for (BuiltInClientConfig config : builtInClients) {
-      // Before the first write: two entries for one client contradict each other, and reporting
-      // that half-way through leaves the realm partly provisioned.
-      Validate.isTrue(
-          byClient.put(config.client(), config) == null,
-          "Client '%s' is configured more than once",
-          config.client().getClientId());
-    }
+    builtInClients.forEach(config -> byClient.put(config.client(), config));
 
     Changes changes = changes();
     ClientsResource clientsResource = getRealmResource().clients();
@@ -283,10 +279,24 @@ public class RealmManager {
     return declared != null ? declared : Boolean.FALSE;
   }
 
-  /** A wildcard lets any URI under it receive the authorization code. Keycloak accepts them. */
+  /**
+   * A wildcard lets any URI under it receive the authorization code, or the user after logout.
+   * Keycloak accepts them.
+   */
   private static void assertRedirectUrisAreNotWildcards(ClientRepresentation client) {
     assertNoWildcards(client.getClientId(), "redirect URI", client.getRedirectUris());
     assertNoWildcards(client.getClientId(), "web origin", client.getWebOrigins());
+    String postLogoutRedirectUris =
+        client.getAttributes() == null
+            ? null
+            : client.getAttributes().get(POST_LOGOUT_REDIRECT_URIS_ATTRIBUTE);
+    if (postLogoutRedirectUris != null) {
+      // Keycloak keeps the list in one attribute, separated by "##".
+      assertNoWildcards(
+          client.getClientId(),
+          "post-logout redirect URI",
+          List.of(postLogoutRedirectUris.split("##")));
+    }
   }
 
   private static void assertNoWildcards(String clientId, String what, List<String> values) {
@@ -320,6 +330,7 @@ public class RealmManager {
         "Client '%s' carries the managed prefix '%s' and belongs in provisionManagedClients",
         clientId,
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
+    assertClientScopesAreCompletelySpecified(client);
     assertRedirectUrisAreNotWildcards(client);
     return provisionManagedClients(
         List.of(withSecurityFlagDefaults(client)),

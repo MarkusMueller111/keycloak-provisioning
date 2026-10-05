@@ -111,6 +111,24 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account").isEnabled()).isTrue();
   }
 
+  @Test
+  void rejectsDisablingRealmManagement() {
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    realmManager ->
+                        realmManager.provisionBuiltInClients(
+                            List.of(
+                                BuiltInClientConfig.forClient(
+                                        KeycloakProvidedClient.REALM_MANAGEMENT)
+                                    .enabled(false)
+                                    .build()))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("realm-management");
+
+    assertThat(findClient("broker").isEnabled()).isTrue();
+  }
+
   /** The fallback is the hardened default, not merely enabled. */
   @Test
   void restoresTheHardenedDefaultOfABuiltInClientThatIsNotDeclared() {
@@ -415,7 +433,7 @@ class ClientProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void rejectsWildcardRedirectUrisAndWebOrigins() {
+  void rejectsWildcardRedirectsAndWebOrigins() {
     ClientRepresentation wildcardRedirect = client("system-a");
     wildcardRedirect.setRedirectUris(List.of("https://app.example.com/*"));
 
@@ -431,6 +449,15 @@ class ClientProvisioningTest extends SharedKeycloakTest {
             () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(wildcardOrigin))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("web origin");
+
+    ClientRepresentation wildcardPostLogout = client("system-c");
+    wildcardPostLogout.setAttributes(
+        Map.of("post.logout.redirect.uris", "https://app.example.com/logged-out##https://*"));
+
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.provisionManagedClients(List.of(wildcardPostLogout))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("post-logout redirect URI");
   }
 
   /**
@@ -662,6 +689,13 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(wildcard)))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("redirect URI");
+
+    ClientRepresentation onlyOptional = client("app-half");
+    onlyOptional.setOptionalClientScopes(List.of());
+
+    assertThatThrownBy(() -> withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(onlyOptional)))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("optional");
 
     withRealmManager(rm -> rm.createOrUpdateUnmanagedClient(client("app-scoped")));
 
