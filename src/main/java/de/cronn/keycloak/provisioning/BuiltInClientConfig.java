@@ -1,8 +1,13 @@
 package de.cronn.keycloak.provisioning;
 
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
+import org.apache.commons.lang3.Validate;
 import org.keycloak.representations.idm.ClientRepresentation;
 
 /**
@@ -28,6 +33,34 @@ public record BuiltInClientConfig(
   public BuiltInClientConfig {
     Objects.requireNonNull(client, "client must not be null");
     customizer = customizer == null ? clientRepresentation -> {} : customizer;
+  }
+
+  /**
+   * The declared clients over {@link #BUILT_IN_CLIENT_DEFAULTS}, one entry per client. Rejects a
+   * client declared twice, and a disabled {@code realm-management}, which Keycloak answers with a
+   * 403 mid-provisioning.
+   */
+  public static List<BuiltInClientConfig> mergeOverDefaults(List<BuiltInClientConfig> configured) {
+    Set<KeycloakProvidedClient> seen = new LinkedHashSet<>();
+    if (configured != null) {
+      for (BuiltInClientConfig config : configured) {
+        Validate.isTrue(
+            seen.add(config.client()),
+            "Client '%s' is configured more than once",
+            config.client().getClientId());
+        Validate.isTrue(
+            config.client() != KeycloakProvidedClient.REALM_MANAGEMENT || config.enabled(),
+            "Client '%s' cannot be disabled: it backs the realm's admin permissions",
+            config.client().getClientId());
+      }
+    }
+
+    Map<KeycloakProvidedClient, BuiltInClientConfig> merged = new LinkedHashMap<>();
+    BUILT_IN_CLIENT_DEFAULTS.forEach(config -> merged.put(config.client(), config));
+    if (configured != null) {
+      configured.forEach(config -> merged.put(config.client(), config));
+    }
+    return List.copyOf(merged.values());
   }
 
   public static Builder forClient(KeycloakProvidedClient client) {

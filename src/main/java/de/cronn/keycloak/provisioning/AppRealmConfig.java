@@ -1,7 +1,6 @@
 package de.cronn.keycloak.provisioning;
 
 import java.time.Duration;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -42,7 +41,7 @@ public final class AppRealmConfig {
     this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
     this.passwordPolicy =
         builder.passwordPolicy == null ? PasswordPolicy.DEFAULT : builder.passwordPolicy;
-    this.builtInClients = mergeOverDefaults(builder.builtInClients);
+    this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
     this.bruteForceProtected = builder.bruteForceProtected;
     this.eventsEnabled = builder.eventsEnabled;
     this.eventsExpiration = builder.eventsExpiration;
@@ -82,17 +81,6 @@ public final class AppRealmConfig {
 
   public List<BuiltInClientConfig> builtInClients() {
     return builtInClients;
-  }
-
-  /** A declared client overrides its default; the others keep theirs. */
-  private static List<BuiltInClientConfig> mergeOverDefaults(List<BuiltInClientConfig> configured) {
-    Map<KeycloakProvidedClient, BuiltInClientConfig> merged = new LinkedHashMap<>();
-    BuiltInClientConfig.BUILT_IN_CLIENT_DEFAULTS.forEach(
-        config -> merged.put(config.client(), config));
-    if (configured != null) {
-      configured.forEach(config -> merged.put(config.client(), config));
-    }
-    return List.copyOf(merged.values());
   }
 
   public boolean bruteForceProtected() {
