@@ -170,10 +170,10 @@ The realm's **content** is deliberately not part of the config: roles, groups, c
 differ per project, as does the order they have to be created in, so you provision them with
 `RealmManager` calls afterwards.
 
-**Provision the realm first.** `createOrUpdateRealm` is the only call that refreshes the access
-token, which the admin client issues before your realm exists. Provisioning content into a realm
-that does not exist yet fails with a bare `NotFoundException` from the admin client, which does not
-say which realm is missing. Two more orderings are forced by Keycloak: roles before anything
+**Provision the realm first.** Creating it refreshes the access token, which the admin client
+issued before your realm existed and which does not cover it yet. Provisioning content into a realm
+that does not exist fails with a bare `NotFoundException` from the admin client, which does not say
+which realm is missing. Two more orderings are forced by Keycloak: roles before anything
 referencing them by name, and client scopes before the clients that assign them.
 
 Creating a realm makes Keycloak add a bearer-only `<realm>-realm` client **to the master realm**.

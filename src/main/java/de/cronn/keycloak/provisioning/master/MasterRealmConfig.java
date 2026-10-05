@@ -192,8 +192,8 @@ public final class MasterRealmConfig {
   }
 
   /**
-   * User-profile attribute declarations. Defaults to just the built-in {@code username}/{@code
-   * email} attributes (see {@link UserProfileConfig}).
+   * User-profile attribute declarations. Defaults to Keycloak's built-in attributes (see {@link
+   * UserProfileConfig}).
    */
   public UserProfileConfig userProfile() {
     return userProfile;
