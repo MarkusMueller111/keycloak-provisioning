@@ -57,10 +57,7 @@ public final class MasterRealmConfig {
         builder.sessionMaxLifespan == null ? Duration.ofHours(1) : builder.sessionMaxLifespan;
     this.bruteForceProtected = builder.bruteForceProtected;
     this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
-    this.securityHeaders =
-        builder.securityHeaders == null
-            ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
-            : Map.copyOf(builder.securityHeaders);
+    this.securityHeaders = SecurityHeader.mergeOverDefaults(builder.securityHeaders);
     this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
     this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
     this.eventsExpiration =
@@ -305,6 +302,9 @@ public final class MasterRealmConfig {
       return this;
     }
 
+    /**
+     * Merged over {@link SecurityHeader#DEFAULT_VALUES} per header; an empty value sends no header.
+     */
     public Builder securityHeaders(Map<SecurityHeader, String> securityHeaders) {
       this.securityHeaders = securityHeaders;
       return this;

@@ -58,10 +58,7 @@ public final class AppRealmConfig {
     this.sessionMaxLifespan =
         builder.sessionMaxLifespan == null ? Duration.ofHours(1) : builder.sessionMaxLifespan;
     this.accessTokenLifespan = builder.accessTokenLifespan;
-    this.securityHeaders =
-        builder.securityHeaders == null
-            ? Map.copyOf(SecurityHeader.DEFAULT_VALUES)
-            : Map.copyOf(builder.securityHeaders);
+    this.securityHeaders = SecurityHeader.mergeOverDefaults(builder.securityHeaders);
     this.realmCustomizer = builder.realmCustomizer == null ? realm -> {} : builder.realmCustomizer;
   }
 
@@ -221,6 +218,9 @@ public final class AppRealmConfig {
       return this;
     }
 
+    /**
+     * Merged over {@link SecurityHeader#DEFAULT_VALUES} per header; an empty value sends no header.
+     */
     public Builder securityHeaders(Map<SecurityHeader, String> securityHeaders) {
       this.securityHeaders = securityHeaders;
       return this;

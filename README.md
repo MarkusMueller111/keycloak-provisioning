@@ -198,8 +198,9 @@ The defaults include a password policy (`length(12) and notContainsUsername and 
 lowerCase(1) and digits(1) and specialChars(1) and maxAuthAge(0)`), a 5-minute session idle
 timeout with a 1-hour maximum lifespan, brute-force protection, security headers, login events kept
 for 90 days and admin events for 7, and a user profile that requires an email address. Every one
-of them is a builder method away — override what does not fit and leave the rest. An event
-expiration of `Duration.ZERO` keeps events forever.
+of them is a builder method away — override what does not fit and leave the rest. Security headers
+you declare are merged over the defaults per header, so naming one keeps the others; an empty value
+sends no header. An event expiration of `Duration.ZERO` keeps events forever.
 
 ### 🔑 Permanent admin
 
