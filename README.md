@@ -297,7 +297,7 @@ connection is opened.
 | `provisionExecutions` | deletes every execution of the named flows that is not in the list                                                                       |
 | `provisionDefaultRoleComposites` | removes every composite of the realm's default role not in the list                                                                      |
 | `provisionUserProfile` | deletes every user-profile attribute not declared and not a Keycloak built-in                                                            |
-| `provisionRequiredActions` | unregisters every required action not in the list — an empty list is a no-op, not "remove all" |
+| `provisionRequiredActions` | unregisters every required action not in the list — an empty list means "not declared" here, so Keycloak's own are left alone |
 | `provisionBuiltInClients` | resets every client Keycloak provides that is not in the list to its hardened default, which for `broker` and `admin-cli` means disabled |
 | `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list                                                          |
 | `TestUserProvisioner.provisionUsers` | deletes **every user in the realm** that is not in the list — see [below](#provisioning-test-users-with-testuserprovisioner) |
