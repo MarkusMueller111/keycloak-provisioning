@@ -41,7 +41,11 @@ public class AppRealmProvisioner {
   }
 
   public ProvisioningResult provision() {
-    return realmManager.createOrUpdateRealm(this::configureRealm);
+    // admin-cli enables a password grant that bypasses the browser flow and any 2FA in it, which
+    // is worth closing in an application realm as much as in master.
+    return realmManager
+        .createOrUpdateRealm(this::configureRealm)
+        .plus(realmManager.provisionBuiltInClients(config.builtInClients()));
   }
 
   public RealmManager getRealmManager() {

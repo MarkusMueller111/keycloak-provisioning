@@ -111,6 +111,25 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(findClient("account").isEnabled()).isTrue();
   }
 
+  /** The fallback is the hardened default, not merely enabled. */
+  @Test
+  void restoresTheHardenedDefaultOfABuiltInClientThatIsNotDeclared() {
+    withRealmManager(
+        realmManager ->
+            realmManager.provisionBuiltInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(true)
+                        .build())));
+    assertThat(findClient("admin-cli").isEnabled()).isTrue();
+
+    withRealmManager(realmManager -> realmManager.provisionBuiltInClients(List.of()));
+
+    assertThat(findClient("admin-cli").isEnabled()).isFalse();
+    assertThat(findClient("broker").isEnabled()).isFalse();
+    assertThat(findClient("account").isStandardFlowEnabled()).isFalse();
+  }
+
   @Test
   void reEnablesABuiltInClientThatIsNoLongerDisabled() {
     withRealmManager(
