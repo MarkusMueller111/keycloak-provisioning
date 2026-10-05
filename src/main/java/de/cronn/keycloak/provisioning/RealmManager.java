@@ -810,10 +810,13 @@ public class RealmManager {
       Map<String, List<FlowExecution>> configuredExecutions) {
     Changes changes = changes();
     configuredExecutions.forEach(
+        (flowName, flowExecutions) ->
+            assertExecutionsAreDistinguishable(flowName, toRepresentations(flowExecutions)));
+
+    configuredExecutions.forEach(
         (flowName, flowExecutions) -> {
           List<AuthenticationExecutionInfoRepresentation> executions =
               toRepresentations(flowExecutions);
-          assertExecutionsAreDistinguishable(flowName, executions);
 
           // Re-read per flow: an earlier flow's changes are already applied, and getExecutions
           // returns the whole tree flattened, so it has to be narrowed to this flow's own level.
