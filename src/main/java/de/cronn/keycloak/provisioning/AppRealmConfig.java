@@ -10,8 +10,9 @@ import org.apache.commons.lang3.Validate;
 import org.keycloak.representations.idm.RealmRepresentation;
 
 /**
- * Realm-level settings for an application realm, as a plain builder. Only settings Keycloak does
- * not already default sensibly are modelled; anything else — locales, theme, SMTP, password policy,
+ * Realm-level settings for an application realm, as a plain builder. Hardens what Keycloak leaves
+ * open: a password policy, a 5 minute idle and 1 hour maximum session, brute-force protection,
+ * events, security headers and its built-in clients. Anything not modelled — locales, theme, SMTP,
  * WebAuthn — is left to {@link Builder#realmCustomizer(Consumer)}.
  *
  * <p>The realm's <em>content</em> (roles, groups, clients, scopes) is deliberately not part of

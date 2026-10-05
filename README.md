@@ -155,10 +155,16 @@ AppRealmConfig config =
 new AppRealmProvisioner(realmManager, config).provision();
 ```
 
-It covers only settings Keycloak does not already default sensibly — brute-force protection and
-events are turned on, everything else keeps Keycloak's own default. Anything not modelled (locales,
-login theme, SMTP, password policy, WebAuthn) goes through `realmCustomizer`, which runs last and
-can override the rest.
+It hardens what Keycloak leaves open rather than copying its defaults: the same password policy and
+session limits as the master realm, brute-force protection, events, security headers, and the same
+treatment of Keycloak's built-in clients — `admin-cli` and `broker` disabled. Anything not modelled
+(locales, login theme, SMTP, WebAuthn) goes through `realmCustomizer`, which runs last and can
+override the rest.
+
+> [!IMPORTANT]
+> The session defaults log an end user out after 5 idle minutes, with a 1 hour cap. That suits an
+> admin realm more than most applications — set `sessionIdleTimeout` and `sessionMaxLifespan` to
+> what yours needs.
 
 The realm's **content** is deliberately not part of the config: roles, groups, clients and scopes
 differ per project, as does the order they have to be created in, so you provision them with
