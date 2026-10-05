@@ -5,9 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import java.time.Duration;
+import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 
 class AppRealmProvisioningTest extends SharedKeycloakTest {
@@ -49,6 +51,31 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
     provision(AppRealmConfig.builder(APP_REALM).build());
 
     assertThat(findRealm().isEnabled()).isTrue();
+  }
+
+  /** admin-cli's password grant bypasses the browser flow, so an app realm closes it too. */
+  @Test
+  void disablesTheSameBuiltInClientsAsTheMasterRealm() {
+    provision(AppRealmConfig.builder(APP_REALM).build());
+
+    assertThat(appClient("admin-cli").isEnabled()).isFalse();
+    assertThat(appClient("broker").isEnabled()).isFalse();
+    assertThat(appClient("account").isStandardFlowEnabled()).isFalse();
+  }
+
+  @Test
+  void letsAnAppRealmKeepABuiltInClient() {
+    provision(
+        AppRealmConfig.builder(APP_REALM)
+            .builtInClients(
+                List.of(
+                    BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
+                        .enabled(true)
+                        .build()))
+            .build());
+
+    assertThat(appClient("admin-cli").isEnabled()).isTrue();
+    assertThat(appClient("broker").isEnabled()).isFalse();
   }
 
   @Test
@@ -189,5 +216,9 @@ class AppRealmProvisioningTest extends SharedKeycloakTest {
 
   private RealmRepresentation findRealm() {
     return adminClient().realm(APP_REALM).toRepresentation();
+  }
+
+  private ClientRepresentation appClient(String clientId) {
+    return adminClient().realm(APP_REALM).clients().findByClientId(clientId).getFirst();
   }
 }

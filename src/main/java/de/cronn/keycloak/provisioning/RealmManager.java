@@ -150,6 +150,14 @@ public class RealmManager {
     return changes.result();
   }
 
+  /** The hardened default, so a built-in left out is reset to it rather than merely enabled. */
+  private static BuiltInClientConfig defaultFor(KeycloakProvidedClient builtIn) {
+    return BuiltInClientConfig.BUILT_IN_CLIENT_DEFAULTS.stream()
+        .filter(config -> config.client() == builtIn)
+        .findFirst()
+        .orElseGet(() -> BuiltInClientConfig.forClient(builtIn).build());
+  }
+
   /**
    * Provisions Keycloak's own clients: what {@code builtInClients} declares is applied, every other
    * built-in is reset to the default in {@link BuiltInClientConfig#BUILT_IN_CLIENT_DEFAULTS}, which
@@ -181,8 +189,7 @@ public class RealmManager {
       if (client == null) {
         continue;
       }
-      BuiltInClientConfig config =
-          byClient.getOrDefault(builtIn, BuiltInClientConfig.forClient(builtIn).build());
+      BuiltInClientConfig config = byClient.getOrDefault(builtIn, defaultFor(builtIn));
 
       String before = AbstractDiffer.toJson(client);
       config.applyTo(client);

@@ -1,6 +1,8 @@
 package de.cronn.keycloak.provisioning;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -21,6 +23,7 @@ public final class AppRealmConfig {
   private final String displayName;
   private final SslRequired sslRequired;
   private final String passwordPolicy;
+  private final List<BuiltInClientConfig> builtInClients;
   private final boolean bruteForceProtected;
   private final boolean eventsEnabled;
   private final Duration eventsExpiration;
@@ -38,6 +41,7 @@ public final class AppRealmConfig {
     this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
     this.passwordPolicy =
         builder.passwordPolicy == null ? PasswordPolicy.DEFAULT : builder.passwordPolicy;
+    this.builtInClients = mergeOverDefaults(builder.builtInClients);
     this.bruteForceProtected = builder.bruteForceProtected;
     this.eventsEnabled = builder.eventsEnabled;
     this.eventsExpiration = builder.eventsExpiration;
@@ -73,6 +77,21 @@ public final class AppRealmConfig {
 
   public String passwordPolicy() {
     return passwordPolicy;
+  }
+
+  public List<BuiltInClientConfig> builtInClients() {
+    return builtInClients;
+  }
+
+  /** A declared client overrides its default; the others keep theirs. */
+  private static List<BuiltInClientConfig> mergeOverDefaults(List<BuiltInClientConfig> configured) {
+    Map<KeycloakProvidedClient, BuiltInClientConfig> merged = new LinkedHashMap<>();
+    BuiltInClientConfig.BUILT_IN_CLIENT_DEFAULTS.forEach(
+        config -> merged.put(config.client(), config));
+    if (configured != null) {
+      configured.forEach(config -> merged.put(config.client(), config));
+    }
+    return List.copyOf(merged.values());
   }
 
   public boolean bruteForceProtected() {
@@ -124,6 +143,7 @@ public final class AppRealmConfig {
     private String displayName;
     private SslRequired sslRequired;
     private String passwordPolicy;
+    private List<BuiltInClientConfig> builtInClients;
     private boolean bruteForceProtected = true;
     private boolean eventsEnabled = true;
     private Duration eventsExpiration;
@@ -147,6 +167,12 @@ public final class AppRealmConfig {
 
     public Builder sslRequired(SslRequired sslRequired) {
       this.sslRequired = sslRequired;
+      return this;
+    }
+
+    /** Merged over {@link BuiltInClientConfig#BUILT_IN_CLIENT_DEFAULTS} per client. */
+    public Builder builtInClients(List<BuiltInClientConfig> builtInClients) {
+      this.builtInClients = builtInClients;
       return this;
     }
 
