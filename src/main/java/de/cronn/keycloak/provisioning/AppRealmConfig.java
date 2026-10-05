@@ -44,9 +44,15 @@ public final class AppRealmConfig {
     this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
     this.bruteForceProtected = builder.bruteForceProtected;
     this.eventsEnabled = builder.eventsEnabled;
-    this.eventsExpiration = builder.eventsExpiration;
+    this.eventsExpiration =
+        builder.eventsExpiration == null
+            ? EventRetention.DEFAULT_EVENTS_EXPIRATION
+            : builder.eventsExpiration;
     this.adminEventsEnabled = builder.adminEventsEnabled;
-    this.adminEventsExpiration = builder.adminEventsExpiration;
+    this.adminEventsExpiration =
+        builder.adminEventsExpiration == null
+            ? EventRetention.DEFAULT_ADMIN_EVENTS_EXPIRATION
+            : builder.adminEventsExpiration;
     this.sessionIdleTimeout =
         builder.sessionIdleTimeout == null ? Duration.ofMinutes(5) : builder.sessionIdleTimeout;
     this.sessionMaxLifespan =
@@ -91,7 +97,7 @@ public final class AppRealmConfig {
     return eventsEnabled;
   }
 
-  /** Null means Keycloak's default: events never expire. */
+  /** {@link Duration#ZERO} means events never expire. */
   public Duration eventsExpiration() {
     return eventsExpiration;
   }
@@ -100,7 +106,7 @@ public final class AppRealmConfig {
     return adminEventsEnabled;
   }
 
-  /** Null means Keycloak's default: admin events never expire. */
+  /** {@link Duration#ZERO} means admin events never expire. */
   public Duration adminEventsExpiration() {
     return adminEventsExpiration;
   }
@@ -182,6 +188,7 @@ public final class AppRealmConfig {
       return this;
     }
 
+    /** Defaults to 90 days; {@link Duration#ZERO} keeps events forever. */
     public Builder eventsExpiration(Duration eventsExpiration) {
       this.eventsExpiration = eventsExpiration;
       return this;
@@ -193,7 +200,7 @@ public final class AppRealmConfig {
       return this;
     }
 
-    /** Not symmetric with {@link #eventsExpiration}: Keycloak stores this as a realm attribute. */
+    /** Defaults to 7 days; {@link Duration#ZERO} keeps admin events forever. */
     public Builder adminEventsExpiration(Duration adminEventsExpiration) {
       this.adminEventsExpiration = adminEventsExpiration;
       return this;

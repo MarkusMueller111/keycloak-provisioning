@@ -2,6 +2,7 @@ package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.Changes;
+import de.cronn.keycloak.provisioning.EventRetention;
 import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.ProvisioningResult;
 import de.cronn.keycloak.provisioning.RealmManager;
@@ -78,14 +79,12 @@ public class MasterRealmProvisioner {
 
   private void configureRealm(RealmRepresentation realmRepresentation) {
     setAttribute(realmRepresentation, "frontendUrl", config.frontendUrl());
-    setAttribute(
-        realmRepresentation,
-        "adminEventsExpiration",
-        String.valueOf(config.adminEventsExpiration().toSeconds()));
 
     realmRepresentation.setEnabled(true);
     realmRepresentation.setAdminEventsEnabled(true);
     realmRepresentation.setEventsEnabled(true);
+    EventRetention.applyTo(
+        realmRepresentation, config.eventsExpiration(), config.adminEventsExpiration());
     realmRepresentation.setBruteForceProtected(config.bruteForceProtected());
     realmRepresentation.setSslRequired(config.sslRequired().getKeycloakValue());
     realmRepresentation.setPasswordPolicy(config.passwordPolicy());

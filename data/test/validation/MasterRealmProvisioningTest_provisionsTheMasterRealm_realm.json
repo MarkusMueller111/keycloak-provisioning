@@ -86,7 +86,7 @@
   "enabled" : true,
   "enabledEventTypes" : [ ],
   "eventsEnabled" : true,
-  "eventsExpiration" : null,
+  "eventsExpiration" : 7776000,
   "eventsListeners" : [ "jboss-logging" ],
   "failureFactor" : 30,
   "federatedUsers" : null,
