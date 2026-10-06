@@ -381,8 +381,9 @@ only rejects it when a user opens their profile.
 
 ### 🧩 Keycloak's own clients
 
-`MasterRealmProvisioner` provisions the six clients Keycloak creates in every realm. By default
-`broker` is disabled and `account` keeps its standard flow off; everything else stays enabled.
+`MasterRealmProvisioner` and `AppRealmProvisioner` both provision the six clients Keycloak creates
+in every realm. By default `broker` and `admin-cli` are disabled and `account` keeps its standard
+flow off; everything else stays enabled.
 
 ```java
 MasterRealmConfig.builder(url, permanentAdmin)
@@ -392,11 +393,11 @@ MasterRealmConfig.builder(url, permanentAdmin)
 ```
 
 What you declare is merged over those defaults per client, so the example above leaves `broker` and
-`account` as they were. These clients are never created or deleted, only adjusted: one you do not
-configure stays exactly as Keycloak made it.
+`account` as they were. These clients are never created or deleted, only adjusted.
 
-`enabled` is written on every run, so dropping an entry re-enables its client — that is what makes
-the configuration reversible. A `customizer` is applied as a delta and is **not** reverted when you
+`enabled` is written on every run, so dropping an entry returns its client to the default above —
+`broker` and `admin-cli` to disabled, the rest to enabled. That is what makes the configuration
+reversible. A `customizer` is applied as a delta and is **not** reverted when you
 remove it, because there is no way to know what Keycloak's value for that field would have been. Set
 the opposite explicitly to undo one.
 

@@ -10,7 +10,6 @@ public enum KeycloakProvidedClient {
   SECURITY_ADMIN_CONSOLE("security-admin-console"),
   ;
 
-  /** Ordered, since it ends up in a LinkedHashSet that reaches log output. */
   private final String clientId;
 
   KeycloakProvidedClient(String clientId) {
