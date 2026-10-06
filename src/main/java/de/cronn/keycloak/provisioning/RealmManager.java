@@ -492,7 +492,10 @@ public class RealmManager {
       if (scope.getProtocolMappers() == null) {
         continue;
       }
-      String id = scopeIdsByName.get(scope.getName());
+      String id =
+          Objects.requireNonNull(
+              scopeIdsByName.get(scope.getName()),
+              () -> "No client scope '" + scope.getName() + "' to provision protocol mappers for.");
       provisionProtocolMappers(
           getRealmResource().clientScopes().get(id).getProtocolMappers(),
           scope.getProtocolMappers(),

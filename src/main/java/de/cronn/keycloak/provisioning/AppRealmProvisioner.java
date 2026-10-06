@@ -6,10 +6,10 @@ import java.util.Objects;
 import org.keycloak.representations.idm.RealmRepresentation;
 
 /**
- * Creates an application realm and keeps its realm-level settings in sync. Deliberately does
- * <em>not</em> provision the realm's content: roles, groups, clients and scopes are the project's
- * own, and their order differs per project, so they are applied by calling {@link RealmManager}
- * afterwards.
+ * Creates an application realm, keeps its realm-level settings in sync and hardens the clients
+ * Keycloak provides. Deliberately does <em>not</em> provision the realm's own content: roles,
+ * groups, clients and scopes are the project's own, and their order differs per project, so they
+ * are applied by calling {@link RealmManager} afterwards.
  *
  * <p>Must run before anything else touches the realm: creating it also refreshes the access token,
  * which was issued before the realm existed and does not cover it yet.
