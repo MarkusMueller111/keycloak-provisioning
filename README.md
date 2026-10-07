@@ -461,9 +461,10 @@ console. A scope name reaches the wire — a client sends `scope=system-orders` 
 of Keycloak's own scopes never being at risk.
 
 The prefix means "provisioned by this library" and nothing else, not a tenant or project marker, so
-`standard()` is almost always right. The provisioning client deliberately carries no prefix: that
-is what keeps your own `provisionManagedClients` call from deleting the identity you are connected
-as.
+`standard()` is almost always right. The provisioning client needs no prefix, and a connection
+exempts its id from the fence either way, so `provisionManagedClients` never deletes the identity
+you are connected as. Name it by your own convention if you already have one — a consumer adopting
+this library one realm at a time keeps the id its other code authenticates with.
 
 A connection passes its naming to every `RealmManager` it creates, so the two cannot disagree:
 
