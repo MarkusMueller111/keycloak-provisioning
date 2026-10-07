@@ -28,6 +28,64 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
       new KeycloakProvisioningClientConfig("keycloak-provisioning", "secret");
 
   /**
+   * A consumer whose own convention names system clients with the managed prefix must be able to
+   * name the provisioning client that way too.
+   */
+  @Test
+  void keepsAProvisioningClientWhoseIdCarriesTheManagedPrefix() {
+    KeycloakProvisioningClientConfig prefixed =
+        new KeycloakProvisioningClientConfig("system-keycloak-provisioning", "secret");
+
+    try (DefaultKeycloakConnectionManager connectionManager =
+        new DefaultKeycloakConnectionManager(
+            new KeycloakDefaultConnectionConfig(
+                serverUrl(),
+                new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, ADMIN_PASSWORD),
+                prefixed))) {
+      RealmManager realmManager = connectionManager.realmManager("master");
+
+      assertThat(clientIds(realmManager)).contains("system-keycloak-provisioning");
+
+      // Declaring none of them must not delete the identity this is connected as.
+      realmManager.provisionManagedClients(List.of());
+
+      assertThat(clientIds(realmManager)).contains("system-keycloak-provisioning");
+    }
+  }
+
+  /** Connecting directly, without the bootstrap manager, fences the same client id. */
+  @Test
+  void keepsAPrefixedProvisioningClientWhenConnectedDirectly() {
+    KeycloakProvisioningClientConfig prefixed =
+        new KeycloakProvisioningClientConfig("system-keycloak-provisioning", "secret");
+
+    try (DefaultKeycloakConnectionManager bootstrap =
+        new DefaultKeycloakConnectionManager(
+            new KeycloakDefaultConnectionConfig(
+                serverUrl(),
+                new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, ADMIN_PASSWORD),
+                prefixed))) {
+      assertThat(clientIds(bootstrap.realmManager("master")))
+          .contains("system-keycloak-provisioning");
+    }
+
+    try (KeycloakProvisioningConnectionManager direct =
+        new KeycloakProvisioningConnectionManager(serverUrl(), prefixed)) {
+      RealmManager realmManager = direct.realmManager("master");
+
+      realmManager.provisionManagedClients(List.of());
+
+      assertThat(clientIds(realmManager)).contains("system-keycloak-provisioning");
+    }
+  }
+
+  private static List<String> clientIds(RealmManager realmManager) {
+    return realmManager.getRealmResource().clients().findAll().stream()
+        .map(org.keycloak.representations.idm.ClientRepresentation::getClientId)
+        .toList();
+  }
+
+  /**
    * Before the provisioning client exists nothing can authenticate as it, so the first connect has
    * to fall back to the bootstrap admin to create it.
    */

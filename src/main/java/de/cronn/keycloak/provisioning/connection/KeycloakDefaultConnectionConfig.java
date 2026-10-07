@@ -35,7 +35,9 @@ public final class KeycloakDefaultConnectionConfig {
     this.serverUrl = Validate.notBlank(serverUrl);
     this.adminCredentialsConfig = Objects.requireNonNull(adminCredentialsConfig);
     this.provisioningClientConfig = Objects.requireNonNull(provisioningClientConfig);
-    this.clientNaming = Objects.requireNonNull(clientNaming);
+    this.clientNaming =
+        Objects.requireNonNull(clientNaming)
+            .withProvisioningClient(provisioningClientConfig.clientId());
   }
 
   public ManagedNaming clientNaming() {

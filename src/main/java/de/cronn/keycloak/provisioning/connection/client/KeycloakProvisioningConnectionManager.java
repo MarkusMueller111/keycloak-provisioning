@@ -16,7 +16,7 @@ public final class KeycloakProvisioningConnectionManager extends KeycloakConnect
 
   public KeycloakProvisioningConnectionManager(
       String serverUrl, KeycloakProvisioningClientConfig config, ManagedNaming clientNaming) {
-    super(clientNaming);
+    super(clientNaming.withProvisioningClient(config.clientId()));
     this.keycloak =
         getDefaultKeycloakBuilder(serverUrl)
             .grantType(OAuth2Constants.CLIENT_CREDENTIALS)

@@ -30,14 +30,20 @@ public final class ManagedNaming {
   private final String groupPrefix;
   private final String rolePrefix;
   private final String clientScopePrefix;
+  private final String provisioningClientId;
 
   private ManagedNaming(
-      String clientPrefix, String groupPrefix, String rolePrefix, String clientScopePrefix) {
+      String clientPrefix,
+      String groupPrefix,
+      String rolePrefix,
+      String clientScopePrefix,
+      String provisioningClientId) {
     this.clientPrefix = Validate.notBlank(clientPrefix, "client prefix must not be blank");
     this.groupPrefix = Validate.notBlank(groupPrefix, "group prefix must not be blank");
     this.rolePrefix = Validate.notBlank(rolePrefix, "role prefix must not be blank");
     this.clientScopePrefix =
         Validate.notBlank(clientScopePrefix, "client scope prefix must not be blank");
+    this.provisioningClientId = provisioningClientId;
   }
 
   public static ManagedNaming standard() {
@@ -45,7 +51,8 @@ public final class ManagedNaming {
         STANDARD_CLIENT_PREFIX,
         STANDARD_GROUP_PREFIX,
         STANDARD_ROLE_PREFIX,
-        STANDARD_CLIENT_SCOPE_PREFIX);
+        STANDARD_CLIENT_SCOPE_PREFIX,
+        null);
   }
 
   /**
@@ -54,7 +61,21 @@ public final class ManagedNaming {
    */
   public static ManagedNaming custom(
       String clientPrefix, String groupPrefix, String rolePrefix, String clientScopePrefix) {
-    return new ManagedNaming(clientPrefix, groupPrefix, rolePrefix, clientScopePrefix);
+    return new ManagedNaming(clientPrefix, groupPrefix, rolePrefix, clientScopePrefix, null);
+  }
+
+  /**
+   * The same naming, with the provisioning client held outside the fence. A consumer whose own
+   * convention already puts that client inside the managed namespace would otherwise have the
+   * library delete the identity it is connected as on the first run that does not redeclare it.
+   */
+  public ManagedNaming withProvisioningClient(String provisioningClientId) {
+    return new ManagedNaming(
+        clientPrefix,
+        groupPrefix,
+        rolePrefix,
+        clientScopePrefix,
+        Validate.notBlank(provisioningClientId, "provisioning client id must not be blank"));
   }
 
   public ManagedName clientId(String clientId) {
@@ -96,7 +117,11 @@ public final class ManagedNaming {
 
   /** For the cases where only the name is at hand; prefer the representation overloads. */
   public boolean isManaged(ManagedEntity entity, String name) {
-    return Objects.requireNonNull(name).startsWith(prefix(entity));
+    Objects.requireNonNull(name);
+    if (entity == ManagedEntity.CLIENT && name.equals(provisioningClientId)) {
+      return false;
+    }
+    return name.startsWith(prefix(entity));
   }
 
   public String prefix(ManagedEntity entity) {
