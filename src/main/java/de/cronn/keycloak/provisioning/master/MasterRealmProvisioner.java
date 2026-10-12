@@ -148,7 +148,13 @@ public class MasterRealmProvisioner {
       // Roll back, so a half-created admin is not mistaken for an existing one on the next run,
       // which would then delete the temporary admins and leave the realm unreachable.
       log.info("Deleting half-created permanent admin '{}'", username);
-      realmManager.deleteUser(userId);
+      try {
+        realmManager.deleteUser(userId);
+      } catch (RuntimeException rollbackFailure) {
+        // The half-created admin now survives, so the next run would take it for a provisioned one
+        // and delete the temporary admins; say so alongside what actually went wrong.
+        e.addSuppressed(rollbackFailure);
+      }
       throw e;
     }
   }
