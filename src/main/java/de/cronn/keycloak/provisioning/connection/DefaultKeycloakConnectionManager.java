@@ -5,6 +5,7 @@ import de.cronn.keycloak.provisioning.RealmManager;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningConnectionManager;
 import de.cronn.keycloak.provisioning.connection.client.ProvisioningClientBootstrapper;
+import jakarta.ws.rs.ForbiddenException;
 import jakarta.ws.rs.NotAuthorizedException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.keycloak.admin.client.Keycloak;
@@ -31,7 +32,7 @@ public final class DefaultKeycloakConnectionManager extends KeycloakConnectionMa
       bootstrapProvisioningClient(this.keycloakProvisioningConnectionManager, config);
     } catch (RuntimeException e) {
       close();
-      if (ExceptionUtils.indexOfType(e, NotAuthorizedException.class) == -1) {
+      if (!isRecoverableByBootstrapping(e)) {
         throw e;
       }
       log.info(
@@ -45,6 +46,15 @@ public final class DefaultKeycloakConnectionManager extends KeycloakConnectionMa
                 config.serverUrl(), config.provisioningClientConfig(), config.clientNaming());
       }
     }
+  }
+
+  /**
+   * 401 when the client cannot authenticate at all, 403 when it can but lost its admin role —
+   * granting that role back is what bootstrapping does, so both are worth the fallback.
+   */
+  private static boolean isRecoverableByBootstrapping(RuntimeException e) {
+    return ExceptionUtils.indexOfType(e, NotAuthorizedException.class) != -1
+        || ExceptionUtils.indexOfType(e, ForbiddenException.class) != -1;
   }
 
   private static String bootstrapFailureMessage(KeycloakDefaultConnectionConfig config) {
