@@ -28,6 +28,7 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.CreatedResponseUtil;
 import org.keycloak.admin.client.Keycloak;
@@ -793,6 +794,7 @@ public class RealmManager {
    * created outside this call are at risk of deletion. Safe to call repeatedly.
    */
   public ProvisioningResult provisionFlows(List<AuthenticationFlowRepresentation> flows) {
+    flows.forEach(RealmManager::assertFlowTypeIsDeclared);
     Changes changes = changes();
     List<AuthenticationFlowRepresentation> existingFlows =
         getRealmResource().flows().getFlows().stream()
@@ -808,6 +810,18 @@ public class RealmManager {
         .filter(flow -> !configuredAliases.contains(flow.getAlias()))
         .forEach(flow -> deleteFlow(flow, changes));
     return changes.result();
+  }
+
+  /**
+   * Keycloak answers a flow without a type with "Duplicate resource", which names the wrong
+   * problem: nothing is duplicated and the flow is never created, on the first run or any later
+   * one.
+   */
+  private static void assertFlowTypeIsDeclared(AuthenticationFlowRepresentation flow) {
+    Validate.isTrue(
+        StringUtils.isNotBlank(flow.getProviderId()),
+        "Flow '%s' declares no providerId. Set the flow type, 'basic-flow' for an ordinary one.",
+        flow.getAlias());
   }
 
   private void createOrUpdateFlow(

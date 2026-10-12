@@ -361,6 +361,23 @@ class FlowProvisioningTest extends SharedKeycloakTest {
                         new FlowExecution.SubFlow("nested", "a nested flow", null)))));
   }
 
+  /** Keycloak's own answer is a 409 "Duplicate resource", which names the wrong problem. */
+  @Test
+  void rejectsAFlowWithoutAType() {
+    AuthenticationFlowRepresentation withoutType = flow("no-type", "a flow without a type");
+    withoutType.setProviderId(null);
+
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    rm -> rm.provisionFlows(List.of(flow(FLOW, "a test flow"), withoutType))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("no-type")
+        .hasMessageContaining("basic-flow");
+
+    assertThat(flowAliases()).doesNotContain("no-type", FLOW);
+  }
+
   private static AuthenticationFlowRepresentation flow(String alias, String description) {
     AuthenticationFlowRepresentation flow = new AuthenticationFlowRepresentation();
     flow.setAlias(alias);
