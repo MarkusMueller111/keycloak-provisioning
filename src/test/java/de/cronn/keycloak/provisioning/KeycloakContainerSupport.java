@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakDefaultConnectionConfig;
+import de.cronn.keycloak.provisioning.connection.KeycloakWriteRecorder;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentialsConfig;
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
