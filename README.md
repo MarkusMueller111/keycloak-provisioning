@@ -327,6 +327,13 @@ connection is opened.
 the flow each belongs to:
 
 ```java
+AuthenticationFlowRepresentation browserFlow = new AuthenticationFlowRepresentation();
+browserFlow.setAlias("my-browser-flow");
+browserFlow.setDescription("Browser flow with OTP");
+browserFlow.setProviderId("basic-flow");
+browserFlow.setTopLevel(true);
+browserFlow.setBuiltIn(false);
+
 realmManager.provisionFlows(List.of(browserFlow));
 
 Map<String, List<FlowExecution>> executions = new LinkedHashMap<>();
@@ -343,6 +350,10 @@ realmManager.provisionExecutions(executions);
 Entries are applied in iteration order, and a sub-flow only exists once the entry that declares it
 has run — so use an ordered map and name a flow before the entry that fills it. `Map.of` iterates in
 an unspecified order and will fail with a 404 on some runs and not others.
+
+`providerId` is the flow type and has to be set — `basic-flow` for an ordinary flow. Keycloak
+answers one without it with "Duplicate resource", so `provisionFlows` rejects it before writing
+anything.
 
 > [!IMPORTANT]
 > Only top-level flows go to `provisionFlows`. A `SubFlow` entry creates the nested flow itself, so
