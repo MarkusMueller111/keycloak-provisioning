@@ -1,5 +1,6 @@
 package de.cronn.keycloak.provisioning.connection;
 
+import java.util.List;
 import java.util.regex.Pattern;
 
 /**
@@ -12,13 +13,47 @@ final class KeycloakLoggedBody {
   private static final int HEAD_LENGTH = 64 * 1024;
   private static final int TAIL_LENGTH = 4 * 1024;
 
-  /** The value alternatives matter: an escaped quote must not end the match and leak the tail. */
+  private static final List<String> SECRET_KEYS =
+      List.of(
+          "access_token",
+          "refresh_token",
+          "id_token",
+          "secret",
+          "secretData",
+          "credentialData",
+          "value",
+          "credentials",
+          "privateKey",
+          "client_secret",
+          "clientSecret",
+          "password");
+
+  /** An escaped quote must not end the string, or the rest of the value leaks. */
+  private static final String STRING = "\"(?:\\\\.|[^\"\\\\])*\"";
+
+  /** A form body sends every value as an array, so the brackets have to go with it. */
+  private static final String ARRAY = "\\[(?:" + STRING + "|[^\\]\"])*\\]";
+
+  /** A number or boolean: anything up to the end of the field. */
+  private static final String BARE = "[^,}\\]\\s]+";
+
   private static final Pattern SECRETS =
       Pattern.compile(
-          "\"(access_token|refresh_token|id_token|secret|secretData|credentialData|value|"
-              + "credentials|privateKey|client_secret|clientSecret|password)\"\\s*:\\s*"
-              + "(?:\"(?:\\\\.|[^\"\\\\])*\"|[^,}\\]\\s]+)",
+          quoted(capture(anyOf(SECRET_KEYS))) + "\\s*:\\s*" + anyOf(List.of(ARRAY, STRING, BARE)),
           Pattern.CASE_INSENSITIVE);
+
+  private static String anyOf(List<String> alternatives) {
+    return "(?:" + String.join("|", alternatives) + ")";
+  }
+
+  /** The key is the only group the replacement reads back. */
+  private static String capture(String pattern) {
+    return "(" + pattern + ")";
+  }
+
+  private static String quoted(String pattern) {
+    return "\"" + pattern + "\"";
+  }
 
   private KeycloakLoggedBody() {}
 
