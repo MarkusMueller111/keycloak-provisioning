@@ -5,9 +5,9 @@ import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.differ.AbstractDiffer;
 import de.cronn.keycloak.provisioning.differ.AuthenticationExecutionRepresentationDiffer;
+import de.cronn.keycloak.provisioning.differ.AuthenticationFlowRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientScopeRepresentationDiffer;
-import de.cronn.keycloak.provisioning.differ.Declared;
 import de.cronn.keycloak.provisioning.differ.Differ;
 import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
@@ -837,14 +837,13 @@ public class RealmManager {
             .filter(flow -> flow.isBuiltIn() != Boolean.TRUE)
             .toList();
 
-    // Create first: renaming a flow would otherwise leave a window with neither.
-    flows.forEach(flow -> createOrUpdateFlow(flow, existingFlows, changes));
+    AuthenticationFlowRepresentationDiffer differ =
+        new AuthenticationFlowRepresentationDiffer(existingFlows, flows);
 
-    Set<String> configuredAliases =
-        flows.stream().map(AuthenticationFlowRepresentation::getAlias).collect(Collectors.toSet());
-    existingFlows.stream()
-        .filter(flow -> !configuredAliases.contains(flow.getAlias()))
-        .forEach(flow -> deleteFlow(flow, changes));
+    // Create first: renaming a flow would otherwise leave a window with neither.
+    differ.getElementsToAdd().forEach(flow -> addFlow(flow, changes));
+    differ.getElementsToDelete().forEach(flow -> deleteFlow(flow, changes));
+    differ.getElementsToUpdate().forEach(update -> updateFlow(update, changes));
     return changes.result();
   }
 
@@ -860,57 +859,17 @@ public class RealmManager {
         flow.getAlias());
   }
 
-  private void createOrUpdateFlow(
-      AuthenticationFlowRepresentation flow,
-      List<AuthenticationFlowRepresentation> existingFlows,
-      Changes changes) {
-    Optional<AuthenticationFlowRepresentation> existingFlow =
-        existingFlows.stream().filter(f -> Objects.equals(f.getAlias(), flow.getAlias())).findAny();
-    if (existingFlow.isEmpty()) {
-      changes.added(Target.FLOW, flow.getAlias());
-      try (Response response = getRealmResource().flows().createFlow(flow)) {
-        assertResponseIs201Created(response);
-      }
-    } else {
-      updateFlowIfChanged(existingFlow.get(), flow, changes);
+  private void addFlow(AuthenticationFlowRepresentation flow, Changes changes) {
+    changes.added(Target.FLOW, flow.getAlias());
+    try (Response response = getRealmResource().flows().createFlow(flow)) {
+      assertResponseIs201Created(response);
     }
   }
 
-  private void updateFlowIfChanged(
-      AuthenticationFlowRepresentation existingFlow,
-      AuthenticationFlowRepresentation flow,
-      Changes changes) {
-    String description = Declared.orUnset(flow.getDescription(), existingFlow.getDescription());
-    if (Objects.equals(description, existingFlow.getDescription())
-        && Objects.equals(flow.getProviderId(), existingFlow.getProviderId())
-        && Objects.equals(flow.isTopLevel(), existingFlow.isTopLevel())) {
-      return;
-    }
-
-    AuthenticationFlowRepresentation update = new AuthenticationFlowRepresentation();
-    update.setAlias(flow.getAlias());
-    update.setDescription(description);
-    update.setProviderId(flow.getProviderId());
-    update.setTopLevel(flow.isTopLevel());
-    update.setBuiltIn(flow.isBuiltIn());
-    changes.updated(
-        Target.FLOW,
-        flow.getAlias(),
-        Differ.calculateMultilineDiff(
-            AbstractDiffer.toJson(flowFields(existingFlow)), AbstractDiffer.toJson(update)));
-    getRealmResource().flows().updateFlow(existingFlow.getId(), update);
-  }
-
-  /** Without the id and the executions, which a flow's update does not carry. */
-  private static AuthenticationFlowRepresentation flowFields(
-      AuthenticationFlowRepresentation flow) {
-    AuthenticationFlowRepresentation fields = new AuthenticationFlowRepresentation();
-    fields.setAlias(flow.getAlias());
-    fields.setDescription(flow.getDescription());
-    fields.setProviderId(flow.getProviderId());
-    fields.setTopLevel(flow.isTopLevel());
-    fields.setBuiltIn(flow.isBuiltIn());
-    return fields;
+  private void updateFlow(ToUpdate<AuthenticationFlowRepresentation> update, Changes changes) {
+    AuthenticationFlowRepresentation flow = update.newState();
+    changes.updated(Target.FLOW, flow.getAlias(), update.multiLineDiff());
+    getRealmResource().flows().updateFlow(flow.getId(), flow);
   }
 
   private void deleteFlow(AuthenticationFlowRepresentation flow, Changes changes) {
