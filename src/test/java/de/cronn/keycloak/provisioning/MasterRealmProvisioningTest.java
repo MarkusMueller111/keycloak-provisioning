@@ -149,6 +149,35 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
                 () -> new MasterRealmProvisioner(realmManager, config).provision()));
   }
 
+  /**
+   * Keycloak returns a stored SMTP password as {@code **********}, so a declared one can never
+   * match it and the realm is written on every run.
+   */
+  @Test
+  void rewritesTheRealmOnEveryRunWhenSmtpHasAPassword() {
+    MasterRealmConfig config =
+        configBuilder(PermanentAdmin.none())
+            .smtp(
+                new MasterRealmConfig.Smtp(
+                    "keycloak@example.com",
+                    "smtp.example.com",
+                    587,
+                    false,
+                    true,
+                    "mailer",
+                    "secret"))
+            .build();
+    provision(config);
+
+    assertThat(masterRealm().getSmtpServer()).containsEntry("password", "**********");
+
+    withMaster(
+        realmManager ->
+            assertSendsOnlyWrites(
+                () -> new MasterRealmProvisioner(realmManager, config).provision(),
+                "PUT /admin/realms/master"));
+  }
+
   @Test
   void removesTheSmtpServerWhenItIsNoLongerDeclared() {
     provision(
