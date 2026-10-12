@@ -53,7 +53,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
   void disablesAdminCliByDefault() {
     provision(
         MasterRealmConfig.builder(serverUrl(), PermanentAdmin.none())
-            .deleteTemporaryAdminUsers(false)
+            .deleteTemporaryAdmins(false)
             .build());
 
     withMaster(
@@ -223,7 +223,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
                 serverUrl(),
                 new PermanentAdmin.Standard(
                     "permanent-admin", "Str0ng-P4ssw0rd!", "admin@example.com"))
-            .deleteTemporaryAdminUsers(true)
+            .deleteTemporaryAdmins(true)
             .builtInClients(
                 List.of(
                     BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
@@ -267,7 +267,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
   void customizesAdminCliWhileDisablingIt() {
     provision(
         MasterRealmConfig.builder(serverUrl(), PermanentAdmin.none())
-            .deleteTemporaryAdminUsers(false)
+            .deleteTemporaryAdmins(false)
             .builtInClients(
                 List.of(
                     BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)
@@ -307,7 +307,7 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
    */
   private MasterRealmConfig.Builder configBuilder(PermanentAdmin permanentAdmin) {
     return MasterRealmConfig.builder(serverUrl(), permanentAdmin)
-        .deleteTemporaryAdminUsers(false)
+        .deleteTemporaryAdmins(false)
         .builtInClients(
             List.of(
                 BuiltInClientConfig.forClient(KeycloakProvidedClient.ADMIN_CLI)

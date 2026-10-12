@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
+import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.keycloak.admin.client.Keycloak;
@@ -26,9 +27,14 @@ abstract class OwnKeycloakTest extends KeycloakContainerSupport {
     return adminConnection.getKeycloakClient();
   }
 
+  /** Extra container environment, for a bootstrap form the default container does not set up. */
+  protected Map<String, String> extraEnvironment() {
+    return Map.of();
+  }
+
   @BeforeEach
   void startOwnKeycloak() {
-    keycloak = startKeycloak();
+    keycloak = startKeycloak(extraEnvironment());
     adminConnection = adminConnection(keycloak);
   }
 

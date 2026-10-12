@@ -15,6 +15,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.admin.client.resource.UserResource;
+import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 import org.slf4j.Logger;
@@ -61,7 +62,7 @@ public class MasterRealmProvisioner {
             .plus(realmManager.provisionUserProfile(config.userProfile()));
     Changes changes = new Changes(log, realmManager.getRealmName());
     createPermanentAdminIfAbsent(changes);
-    deleteTemporaryAdminUsers(changes);
+    deleteTemporaryAdmins(changes);
     return result.plus(changes.result());
   }
 
@@ -103,10 +104,17 @@ public class MasterRealmProvisioner {
     config.realmCustomizer().accept(realmRepresentation);
   }
 
-  /** Also covers admins created via {@code kc.sh bootstrap-admin}, which carry the same marker. */
-  private void deleteTemporaryAdminUsers(Changes changes) {
-    if (!config.deleteTemporaryAdminUsers()) {
+  /**
+   * Covers both forms {@code kc.sh bootstrap-admin} creates. Clients go first: deleting one takes
+   * its service account with it, which leaves only real users for the second pass.
+   */
+  private void deleteTemporaryAdmins(Changes changes) {
+    if (!config.deleteTemporaryAdmins()) {
       return;
+    }
+    for (ClientRepresentation temporaryAdmin : realmManager.getClientsMarkedAsTemporaryAdmin()) {
+      changes.removed(Target.CLIENT, temporaryAdmin.getClientId());
+      realmManager.deleteClient(temporaryAdmin);
     }
     for (UserRepresentation temporaryAdmin : realmManager.getUsersMarkedAsTemporaryAdmin()) {
       changes.removed(Target.USER, temporaryAdmin.getUsername());
@@ -148,7 +156,7 @@ public class MasterRealmProvisioner {
   /**
    * Naming the permanent admin after a temporary one would leave the realm unreachable: it is taken
    * for already provisioned, so it keeps the bootstrap password and never gets the required
-   * actions, and {@link #deleteTemporaryAdminUsers(Changes)} then removes it as the last step.
+   * actions, and {@link #deleteTemporaryAdmins(Changes)} then removes it as the last step.
    */
   private void assertIsNotATemporaryAdmin(UserRepresentation existing) {
     boolean isTemporaryAdmin =

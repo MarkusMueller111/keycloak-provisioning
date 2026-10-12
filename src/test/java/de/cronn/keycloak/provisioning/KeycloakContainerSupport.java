@@ -10,6 +10,7 @@ import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentia
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Map;
 import java.util.function.Supplier;
 import org.keycloak.admin.client.Keycloak;
 import org.testcontainers.containers.GenericContainer;
@@ -33,13 +34,24 @@ abstract class KeycloakContainerSupport implements KeycloakTestTraits {
   protected static final String ADMIN_USERNAME = "temp-admin";
   protected static final String ADMIN_PASSWORD = "temp-admin-password";
 
-  @SuppressWarnings("resource")
+  protected static final String BOOTSTRAP_CLIENT_ID = "temp-admin-client";
+  protected static final String BOOTSTRAP_CLIENT_SECRET = "temp-admin-client-secret";
+
   static GenericContainer<?> startKeycloak() {
+    return startKeycloak(Map.of());
+  }
+
+  /**
+   * {@code KC_BOOTSTRAP_ADMIN_CLIENT_ID} and friends, for the bootstrap forms the default omits.
+   */
+  @SuppressWarnings("resource")
+  static GenericContainer<?> startKeycloak(Map<String, String> extraEnvironment) {
     GenericContainer<?> container =
         new GenericContainer<>(IMAGE)
             .withExposedPorts(8080, 9000)
             .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", ADMIN_USERNAME)
             .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", ADMIN_PASSWORD)
+            .withEnv(extraEnvironment)
             .withCommand("start", "--optimized", "--http-enabled=true", "--hostname-strict=false")
             .waitingFor(
                 // Health endpoints live on the management port.
