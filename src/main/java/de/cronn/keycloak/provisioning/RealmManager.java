@@ -416,6 +416,9 @@ public class RealmManager {
       Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
     Changes changes = changes();
     assertDeclaredClientScopesExist(clients);
+    clients.forEach(
+        client ->
+            assertMapperProtocolsAreDeclared(client.getProtocolMappers(), client.getClientId()));
     List<ClientRepresentation> existingClients =
         getRealmResource().clients().findAll().stream()
             .filter(existingClientsToConsiderPredicate)
@@ -442,6 +445,9 @@ public class RealmManager {
   public ProvisioningResult provisionManagedClientScopes(
       List<ClientScopeRepresentation> clientScopes) {
     clientScopes.forEach(this::assertClientScopeIsManaged);
+    clientScopes.forEach(RealmManager::assertClientScopeProtocolIsDeclared);
+    clientScopes.forEach(
+        scope -> assertMapperProtocolsAreDeclared(scope.getProtocolMappers(), scope.getName()));
     Changes changes = changes();
 
     ClientScopesResource scopesResource = getRealmResource().clientScopes();
@@ -525,6 +531,36 @@ public class RealmManager {
                       client.getClientId(),
                       changes));
     }
+  }
+
+  /** Keycloak answers a client scope without a protocol with a 400 that names nothing. */
+  private static void assertClientScopeProtocolIsDeclared(ClientScopeRepresentation clientScope) {
+    Validate.isTrue(
+        StringUtils.isNotBlank(clientScope.getProtocol()),
+        "Client scope '%s' declares no protocol. Set it, 'openid-connect' for an ordinary one.",
+        clientScope.getName());
+  }
+
+  /**
+   * Keycloak answers a mapper without a protocol with "Duplicate resource" and ignores the field on
+   * the update, where leaving it unset would otherwise report a change on every run.
+   */
+  private static void assertMapperProtocolsAreDeclared(
+      List<ProtocolMapperRepresentation> mappers, String parent) {
+    if (mappers == null) {
+      return;
+    }
+    mappers.forEach(mapper -> assertMapperProtocolIsDeclared(mapper, parent));
+  }
+
+  private static void assertMapperProtocolIsDeclared(
+      ProtocolMapperRepresentation mapper, String parent) {
+    Validate.isTrue(
+        StringUtils.isNotBlank(mapper.getProtocol()),
+        "Protocol mapper '%s' of '%s' declares no protocol. Set it, 'openid-connect' for an"
+            + " ordinary one.",
+        mapper.getName(),
+        parent);
   }
 
   private void provisionProtocolMappers(

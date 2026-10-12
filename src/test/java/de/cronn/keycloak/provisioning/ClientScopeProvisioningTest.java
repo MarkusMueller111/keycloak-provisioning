@@ -1,6 +1,7 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import de.cronn.keycloak.provisioning.Change.Target;
@@ -146,6 +147,40 @@ class ClientScopeProvisioningTest extends SharedKeycloakTest {
             .build()) {
       return List.of(keycloak.tokenManager().getAccessToken().getScope().split(" "));
     }
+  }
+
+  @Test
+  void rejectsAClientScopeWithoutAProtocol() {
+    ClientScopeRepresentation withoutProtocol = scope("system-no-protocol");
+    withoutProtocol.setProtocol(null);
+
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    rm ->
+                        rm.provisionManagedClientScopes(
+                            List.of(scope("system-a"), withoutProtocol))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("system-no-protocol")
+        .hasMessageContaining("openid-connect");
+
+    assertThat(scopeNames()).doesNotContain("system-no-protocol", "system-a");
+  }
+
+  @Test
+  void rejectsAProtocolMapperWithoutAProtocol() {
+    ProtocolMapperRepresentation withoutProtocol = hardcodedClaim("no-protocol");
+    withoutProtocol.setProtocol(null);
+    ClientScopeRepresentation withTheMapper = scope("system-a");
+    withTheMapper.setProtocolMappers(List.of(withoutProtocol));
+
+    assertThatThrownBy(
+            () -> withRealmManager(rm -> rm.provisionManagedClientScopes(List.of(withTheMapper))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("no-protocol")
+        .hasMessageContaining("system-a");
+
+    assertThat(scopeNames()).doesNotContain("system-a");
   }
 
   private static ProtocolMapperRepresentation hardcodedClaim(String name) {
