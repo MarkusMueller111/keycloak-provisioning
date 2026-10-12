@@ -36,7 +36,7 @@ public sealed interface PermanentAdmin {
   void afterCreate(UserResource userResource);
 
   /**
-   * No standing human admin. Together with the default {@code deleteTemporaryAdminUsers(true)} the
+   * No standing human admin. Together with the default {@code deleteTemporaryAdmins(true)} the
    * realm is left without administrative access by design; create one on demand via {@code kc.sh
    * bootstrap-admin user}.
    */

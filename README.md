@@ -85,9 +85,9 @@ new MasterRealmProvisioner(connection.realmManager("master"), masterConfig).prov
 ```
 
 > [!CAUTION]
-> This deletes Keycloak's temporary admin users once the permanent one exists, so the bootstrap
+> This deletes Keycloak's temporary admins once the permanent one exists, so the bootstrap
 > credentials stop working. Keep the permanent admin's password, or pass
-> `deleteTemporaryAdminUsers(false)` while you are trying things out.
+> `deleteTemporaryAdmins(false)` while you are trying things out.
 
 **3. Provision your realm.** Create it, then put your clients in it.
 
@@ -221,18 +221,23 @@ would leave your configuration and the realm disagreeing about the admin's name 
 comparison your application makes against a token's `preferred_username`.
 
 `PermanentAdmin.none()` skips the admin entirely. Together with the default
-`deleteTemporaryAdminUsers(true)` that deliberately leaves the realm without administrative access,
+`deleteTemporaryAdmins(true)` that deliberately leaves the realm without administrative access,
 for deployments that do not want a standing human admin — create one on demand with `kc.sh
 bootstrap-admin user` when it is actually needed (see [Recovery](#recovery)).
 
-### ⏳ Temporary admin users
+### ⏳ Temporary admins
 
-Keycloak's bootstrap admin and any account created with `kc.sh bootstrap-admin` are marked as
+Keycloak's bootstrap admin and anything created with `kc.sh bootstrap-admin` are marked as
 temporary. Their credentials are usually well known (often `admin` / `admin`), so they should not
 outlive the initial setup.
 
-`provision()` deletes every account marked that way as its last step, right after the permanent
-admin was created. Opt out with `deleteTemporaryAdminUsers(false)`.
+`bootstrap-admin` creates either a user or a client, and both carry the marker. `provision()`
+deletes both as its last step, right after the permanent admin was created — clients first, since
+deleting one takes its service account with it. Opt out with `deleteTemporaryAdmins(false)`.
+
+> [!IMPORTANT]
+> A bootstrap admin *client* is invisible on the user side: Keycloak leaves service accounts out of
+> the user list, so nothing short of deleting the client itself revokes its admin rights.
 
 ### 💻 admin-cli
 

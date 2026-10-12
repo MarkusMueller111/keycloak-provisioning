@@ -71,6 +71,7 @@ public class RealmManager {
   public static final String ADMIN_REALM_ROLE = "admin";
 
   private static final String POST_LOGOUT_REDIRECT_URIS_ATTRIBUTE = "post.logout.redirect.uris";
+  private static final String TEMPORARY_ADMIN_ATTRIBUTE = "is_temporary_admin";
 
   protected final Keycloak keycloak;
   protected final String realmName;
@@ -711,7 +712,24 @@ public class RealmManager {
   }
 
   public List<UserRepresentation> getUsersMarkedAsTemporaryAdmin() {
-    return getRealmResource().users().searchByAttributes("is_temporary_admin:true");
+    return getRealmResource().users().searchByAttributes(TEMPORARY_ADMIN_ATTRIBUTE + ":true");
+  }
+
+  /**
+   * Keycloak leaves service accounts out of the user list, so a bootstrap admin client is only
+   * reachable through its own attribute.
+   */
+  public List<ClientRepresentation> getClientsMarkedAsTemporaryAdmin() {
+    return getRealmResource().clients().findAll().stream()
+        .filter(
+            client ->
+                client.getAttributes() != null
+                    && "true".equals(client.getAttributes().get(TEMPORARY_ADMIN_ATTRIBUTE)))
+        .toList();
+  }
+
+  public void deleteClient(ClientRepresentation client) {
+    getRealmResource().clients().get(client.getId()).remove();
   }
 
   public String createUser(UserRepresentation userRepresentation) {

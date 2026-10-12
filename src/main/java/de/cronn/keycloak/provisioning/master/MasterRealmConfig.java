@@ -37,7 +37,7 @@ public final class MasterRealmConfig {
   private final SslRequired sslRequired;
   private final Map<SecurityHeader, String> securityHeaders;
   private final List<BuiltInClientConfig> builtInClients;
-  private final boolean deleteTemporaryAdminUsers;
+  private final boolean deleteTemporaryAdmins;
   private final Duration eventsExpiration;
   private final Duration adminEventsExpiration;
   private final Set<String> defaultRoleComposites;
@@ -59,7 +59,7 @@ public final class MasterRealmConfig {
     this.sslRequired = builder.sslRequired == null ? SslRequired.EXTERNAL : builder.sslRequired;
     this.securityHeaders = SecurityHeader.mergeOverDefaults(builder.securityHeaders);
     this.builtInClients = BuiltInClientConfig.mergeOverDefaults(builder.builtInClients);
-    this.deleteTemporaryAdminUsers = builder.deleteTemporaryAdminUsers;
+    this.deleteTemporaryAdmins = builder.deleteTemporaryAdmins;
     this.eventsExpiration =
         builder.eventsExpiration == null
             ? EventRetention.DEFAULT_EVENTS_EXPIRATION
@@ -176,10 +176,10 @@ public final class MasterRealmConfig {
   }
 
   /**
-   * @see Builder#deleteTemporaryAdminUsers
+   * @see Builder#deleteTemporaryAdmins
    */
-  public boolean deleteTemporaryAdminUsers() {
-    return deleteTemporaryAdminUsers;
+  public boolean deleteTemporaryAdmins() {
+    return deleteTemporaryAdmins;
   }
 
   /**
@@ -259,7 +259,7 @@ public final class MasterRealmConfig {
     private SslRequired sslRequired;
     private Map<SecurityHeader, String> securityHeaders;
     private List<BuiltInClientConfig> builtInClients;
-    private boolean deleteTemporaryAdminUsers = true;
+    private boolean deleteTemporaryAdmins = true;
     private Duration eventsExpiration;
     private Duration adminEventsExpiration;
     private Set<String> defaultRoleComposites;
@@ -335,8 +335,8 @@ public final class MasterRealmConfig {
      * <p>Independent of whether {@code admin-cli} is disabled: the admin console authenticates
      * through {@code security-admin-console}, so browser login keeps working either way.
      */
-    public Builder deleteTemporaryAdminUsers(boolean deleteTemporaryAdminUsers) {
-      this.deleteTemporaryAdminUsers = deleteTemporaryAdminUsers;
+    public Builder deleteTemporaryAdmins(boolean deleteTemporaryAdmins) {
+      this.deleteTemporaryAdmins = deleteTemporaryAdmins;
       return this;
     }
 
