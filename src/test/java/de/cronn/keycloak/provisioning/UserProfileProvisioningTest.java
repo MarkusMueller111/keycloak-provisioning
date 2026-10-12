@@ -119,6 +119,22 @@ class UserProfileProvisioningTest extends SharedKeycloakTest {
     resource.update(config);
   }
 
+  /** Keycloak keys validations by rule id, so a repeated one would silently win. */
+  @Test
+  void rejectsTheSameValidationRuleTwice() {
+    assertThatThrownBy(
+            () ->
+                UserProfileConfig.AttributeConfig.builder("department")
+                    .validationRules(
+                        List.of(
+                            new UserProfileConfig.ValidationRule.Length(1, 10),
+                            new UserProfileConfig.ValidationRule.Length(2, 20)))
+                    .build())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("department")
+        .hasMessageContaining("more than once");
+  }
+
   private UPAttribute attribute(String name) {
     return adminClient().realm(REALM).users().userProfile().getConfiguration().getAttribute(name);
   }

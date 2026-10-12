@@ -2,6 +2,7 @@ package de.cronn.keycloak.provisioning;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -117,6 +118,20 @@ public final class UserProfileConfig {
           viewableBy == null ? EnumSet.allOf(UserProfileRole.class) : Set.copyOf(viewableBy);
       editableBy = editableBy == null ? EnumSet.of(UserProfileRole.ADMIN) : Set.copyOf(editableBy);
       validationRules = validationRules == null ? List.of() : List.copyOf(validationRules);
+      assertValidationRuleIdsAreDistinct(attributeName, validationRules);
+    }
+
+    /** Keycloak keys an attribute's validations by rule id, so a repeat would silently win. */
+    private static void assertValidationRuleIdsAreDistinct(
+        String attributeName, List<ValidationRule> validationRules) {
+      Set<String> seen = new LinkedHashSet<>();
+      for (ValidationRule rule : validationRules) {
+        Validate.isTrue(
+            seen.add(rule.ruleId()),
+            "Attribute '%s' declares the validation rule '%s' more than once",
+            attributeName,
+            rule.ruleId());
+      }
     }
 
     public static Builder builder(String attributeName) {
