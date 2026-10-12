@@ -51,6 +51,34 @@ class PermanentAdminTest {
         .isEqualTo("admin.user");
   }
 
+  @Test
+  void rejectsAMixedCaseEmail() {
+    assertThatThrownBy(() -> new PermanentAdmin.Standard("admin.user", "pw", "Admin@Example.com"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Admin@Example.com")
+        .hasMessageContaining("lower-case");
+  }
+
+  @Test
+  void acceptsALowerCaseEmail() {
+    assertThat(
+            new PermanentAdmin.Standard("admin.user", "pw", "admin@example.com")
+                .buildUser()
+                .getEmail())
+        .isEqualTo("admin@example.com");
+  }
+
+  @Test
+  void rejectsAMixedCaseEmailOnCustom() {
+    UserRepresentation user = new UserRepresentation();
+    user.setUsername("admin.user");
+    user.setEmail("Admin@Example.com");
+
+    assertThatThrownBy(() -> new PermanentAdmin.Custom(user, userResource -> {}).buildUser())
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Admin@Example.com");
+  }
+
   /** Digits and punctuation are not letters, so they are unaffected by the case rule. */
   @Test
   void acceptsAUsernameWithoutLetters() {

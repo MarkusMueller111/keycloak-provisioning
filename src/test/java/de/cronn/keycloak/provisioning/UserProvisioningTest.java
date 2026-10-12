@@ -240,6 +240,20 @@ class UserProvisioningTest extends SharedKeycloakTest {
     withRealmManager(realmManager -> action.accept(new TestUserProvisioner(realmManager)));
   }
 
+  /** Keycloak lower-cases a stored email, so a mixed-case one is never what the realm holds. */
+  @Test
+  void rejectsAnEmailThatIsNotLowerCase() {
+    UserRepresentation mixedCase = user("alice");
+    mixedCase.setEmail("Alice@Example.com");
+
+    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(mixedCase))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("email")
+        .hasMessageContaining("Alice@Example.com");
+
+    assertThat(usernames()).doesNotContain("alice");
+  }
+
   private static UserRepresentation user(String username) {
     UserRepresentation user = new UserRepresentation();
     user.setUsername(username);

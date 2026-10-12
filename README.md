@@ -216,9 +216,9 @@ effect on an admin that already exists.
 configuration that would disable the required action behind that prompt is rejected by `build()`.
 Use `PermanentAdmin.Custom` for other credential types.
 
-The username has to be lower-case. Keycloak stores it that way regardless, so a mixed-case one
-would leave your configuration and the realm disagreeing about the admin's name — and with it any
-comparison your application makes against a token's `preferred_username`.
+The username and the email have to be lower-case. Keycloak stores both that way regardless, so a
+mixed-case one would leave your configuration and the realm disagreeing about the admin's name —
+and with it any comparison your application makes against a token's `preferred_username`.
 
 `PermanentAdmin.none()` skips the admin entirely. Together with the default
 `deleteTemporaryAdmins(true)` that deliberately leaves the realm without administrative access,

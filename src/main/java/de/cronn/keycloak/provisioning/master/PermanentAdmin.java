@@ -1,8 +1,8 @@
 package de.cronn.keycloak.provisioning.master;
 
 import de.cronn.keycloak.provisioning.RealmManager;
+import de.cronn.keycloak.provisioning.UserFields;
 import de.cronn.keycloak.provisioning.UserProfileConfig;
-import de.cronn.keycloak.provisioning.Usernames;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -50,13 +50,14 @@ public sealed interface PermanentAdmin {
    * with {@code error-user-attribute-required}.
    *
    * <p>{@code initialPassword} has to satisfy the realm's {@link
-   * MasterRealmConfig#passwordPolicy()}, and {@code username} has to be lower-case — see {@link
-   * Usernames#requireLowerCase(String)}.
+   * MasterRealmConfig#passwordPolicy()}, and {@code username} and {@code email} have to be
+   * lower-case — see {@link UserFields}.
    */
   record Standard(String username, String initialPassword, String email) implements PermanentAdmin {
 
     public Standard {
-      Usernames.requireLowerCase(username);
+      UserFields.requireLowerCaseUsername(username);
+      UserFields.requireLowerCaseEmail(email);
       Validate.notBlank(initialPassword, "initialPassword must not be blank");
     }
 
@@ -97,7 +98,8 @@ public sealed interface PermanentAdmin {
     public UserRepresentation buildUser() {
       UserRepresentation userRepresentation =
           Objects.requireNonNull(user, "user must not supply null");
-      Usernames.requireLowerCase(userRepresentation.getUsername());
+      UserFields.requireLowerCaseUsername(userRepresentation.getUsername());
+      UserFields.requireLowerCaseEmail(userRepresentation.getEmail());
       return userRepresentation;
     }
 

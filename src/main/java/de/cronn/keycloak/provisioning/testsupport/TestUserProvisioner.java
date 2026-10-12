@@ -5,7 +5,7 @@ import de.cronn.keycloak.provisioning.Changes;
 import de.cronn.keycloak.provisioning.KeycloakException;
 import de.cronn.keycloak.provisioning.ProvisioningResult;
 import de.cronn.keycloak.provisioning.RealmManager;
-import de.cronn.keycloak.provisioning.Usernames;
+import de.cronn.keycloak.provisioning.UserFields;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserRepresentationDiffer;
 import java.util.List;
@@ -51,10 +51,11 @@ public final class TestUserProvisioner {
    * temporary one therefore asks for a new password again after every run. Only passwords are
    * supported, and not in a realm whose password policy forbids reusing one.
    *
-   * <p>Usernames have to be lower-case — see {@link Usernames#requireLowerCase(String)}.
+   * <p>Usernames and emails have to be lower-case — see {@link UserFields}.
    */
   public ProvisioningResult provisionUsers(List<UserRepresentation> users) {
-    users.forEach(user -> Usernames.requireLowerCase(user.getUsername()));
+    users.forEach(user -> UserFields.requireLowerCaseUsername(user.getUsername()));
+    users.forEach(user -> UserFields.requireLowerCaseEmail(user.getEmail()));
     users.forEach(TestUserProvisioner::assertNoMembershipsAreDeclared);
     users.forEach(TestUserProvisioner::assertOnlyPasswordsAreDeclared);
     if (users.stream().anyMatch(TestUserProvisioner::declaresCredentials)) {
