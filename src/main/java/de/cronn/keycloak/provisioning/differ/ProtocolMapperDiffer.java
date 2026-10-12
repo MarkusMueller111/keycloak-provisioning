@@ -12,7 +12,11 @@ public class ProtocolMapperDiffer extends AbstractDiffer<ProtocolMapperRepresent
       target.setName(source.getName());
       target.setProtocol(source.getProtocol());
       target.setProtocolMapper(source.getProtocolMapper());
-      target.setConfig(withCreationDefaults(source.getConfig()));
+      // A null config means "not declared": overwriting would wipe what Keycloak holds.
+      target.setConfig(
+          source.getConfig() == null
+              ? target.getConfig()
+              : withCreationDefaults(source.getConfig()));
     };
   }
 
@@ -21,9 +25,6 @@ public class ProtocolMapperDiffer extends AbstractDiffer<ProtocolMapperRepresent
    * which replaces the whole config.
    */
   private static Map<String, String> withCreationDefaults(Map<String, String> config) {
-    if (config == null) {
-      return null;
-    }
     Map<String, String> result = new LinkedHashMap<>(config);
     copyIfAbsent(result, "access.token.claim", "introspection.token.claim");
     copyIfAbsent(result, "id.token.claim", "userinfo.token.claim");

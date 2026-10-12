@@ -659,6 +659,25 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     assertThat(clientIds()).doesNotContain("system-a", "system-b");
   }
 
+  /** A null config means "not declared"; overwriting would wipe what Keycloak holds. */
+  @Test
+  void keepsAProtocolMapperConfigThatIsNoLongerDeclared() {
+    ClientRepresentation withConfig = client("system-a");
+    withConfig.setProtocolMappers(List.of(hardcodedClaim("claim", "value")));
+    withRealmManager(realmManager -> realmManager.provisionManagedClients(List.of(withConfig)));
+
+    ProtocolMapperRepresentation withoutConfig = hardcodedClaim("claim", "value");
+    withoutConfig.setConfig(null);
+    ClientRepresentation undeclared = client("system-a");
+    undeclared.setProtocolMappers(List.of(withoutConfig));
+
+    withRealmManager(
+        realmManager ->
+            assertChangesNothing(() -> realmManager.provisionManagedClients(List.of(undeclared))));
+
+    assertThat(mapperConfig("system-a", "claim")).containsEntry("claim.value", "value");
+  }
+
   private static ProtocolMapperRepresentation hardcodedClaim(String name, String value) {
     ProtocolMapperRepresentation mapper = new ProtocolMapperRepresentation();
     mapper.setName(name);
