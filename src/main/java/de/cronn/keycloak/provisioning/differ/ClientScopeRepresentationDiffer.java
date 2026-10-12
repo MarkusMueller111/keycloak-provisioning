@@ -24,8 +24,7 @@ public class ClientScopeRepresentationDiffer extends AbstractDiffer<ClientScopeR
     return (target, source) -> {
       target.setName(source.getName());
       target.setDescription(orUnset(source.getDescription(), target.getDescription()));
-      target.setProtocol(
-          source.getProtocol() != null ? source.getProtocol() : target.getProtocol());
+      target.setProtocol(source.getProtocol());
       warnAboutAttributesBlanked(target, source);
       target.setAttributes(
           mergedMap(

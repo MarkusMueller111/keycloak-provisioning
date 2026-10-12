@@ -641,6 +641,24 @@ class ClientProvisioningTest extends SharedKeycloakTest {
     return client;
   }
 
+  @Test
+  void rejectsAProtocolMapperWithoutAProtocol() {
+    ProtocolMapperRepresentation withoutProtocol = hardcodedClaim("no-protocol", "x");
+    withoutProtocol.setProtocol(null);
+    ClientRepresentation withTheMapper = client("system-b");
+    withTheMapper.setProtocolMappers(List.of(withoutProtocol));
+
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    rm -> rm.provisionManagedClients(List.of(client("system-a"), withTheMapper))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("no-protocol")
+        .hasMessageContaining("system-b");
+
+    assertThat(clientIds()).doesNotContain("system-a", "system-b");
+  }
+
   private static ProtocolMapperRepresentation hardcodedClaim(String name, String value) {
     ProtocolMapperRepresentation mapper = new ProtocolMapperRepresentation();
     mapper.setName(name);
