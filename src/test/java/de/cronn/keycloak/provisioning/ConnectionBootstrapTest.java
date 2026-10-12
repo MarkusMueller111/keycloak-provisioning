@@ -18,6 +18,8 @@ import java.util.Base64;
 import java.util.List;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.jupiter.api.Test;
+import org.keycloak.admin.client.resource.RealmResource;
+import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
@@ -76,6 +78,31 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
       realmManager.provisionManagedClients(List.of());
 
       assertThat(clientIds(realmManager)).contains("system-keycloak-provisioning");
+    }
+  }
+
+  /** The provisioning client can still authenticate, so Keycloak answers 403 rather than 401. */
+  @Test
+  void bootstrapsAgainWhenTheProvisioningClientLostItsAdminRole() {
+    try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
+      assertThat(connectionManager.realmManager("master")).isNotNull();
+    }
+
+    RealmResource master = adminClient().realm("master");
+    String id = master.clients().findByClientId("keycloak-provisioning").getFirst().getId();
+    RoleScopeResource serviceAccountRoles =
+        master
+            .users()
+            .get(master.clients().get(id).getServiceAccountUser().getId())
+            .roles()
+            .realmLevel();
+    serviceAccountRoles.remove(
+        serviceAccountRoles.listAll().stream()
+            .filter(role -> RealmManager.ADMIN_REALM_ROLE.equals(role.getName()))
+            .toList());
+
+    try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
+      assertThat(connectionManager.realmManager("master").getRoles()).isNotEmpty();
     }
   }
 
