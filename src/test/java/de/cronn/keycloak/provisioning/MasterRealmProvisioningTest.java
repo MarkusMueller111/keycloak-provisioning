@@ -111,11 +111,6 @@ class MasterRealmProvisioningTest extends OwnKeycloakTest {
     assertThat(masterUser(username).getEmail()).isEqualTo(created.getEmail());
   }
 
-  /**
-   * Without this the realm ends up unreachable: the temporary admin is taken for an already
-   * provisioned permanent one, so it keeps the bootstrap password, and deleting the temporary
-   * admins then removes the only account left.
-   */
   @Test
   void sendsNoWritesWhenRerunUnchanged() {
     MasterRealmConfig config =
