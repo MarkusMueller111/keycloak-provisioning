@@ -382,7 +382,8 @@ public class RealmManager {
    * Before the first write: a name that does not match a scope in the realm would otherwise only
    * surface once the clients had been added, deleted and updated. Names are case-sensitive.
    */
-  private void assertDeclaredClientScopesExist(List<ClientRepresentation> clients) {
+  private static void assertDeclaredClientScopesExist(
+      List<ClientRepresentation> clients, Set<String> existing) {
     Set<String> declared =
         clients.stream()
             .flatMap(
@@ -399,10 +400,6 @@ public class RealmManager {
       return;
     }
 
-    Set<String> existing =
-        getRealmResource().clientScopes().findAll().stream()
-            .map(ClientScopeRepresentation::getName)
-            .collect(Collectors.toSet());
     for (String name : declared) {
       if (!existing.contains(name)) {
         throw new KeycloakException(
@@ -415,7 +412,10 @@ public class RealmManager {
       List<ClientRepresentation> clients,
       Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
     Changes changes = changes();
-    assertDeclaredClientScopesExist(clients);
+    // Read once if anything needs it: client writes never add or remove a client scope themselves.
+    Map<String, String> scopeIdsByName =
+        declaresAnyClientScopes(clients) ? clientScopeIdsByName() : Map.of();
+    assertDeclaredClientScopesExist(clients, scopeIdsByName.keySet());
     clients.forEach(
         client ->
             assertMapperProtocolsAreDeclared(client.getProtocolMappers(), client.getClientId()));
@@ -429,7 +429,7 @@ public class RealmManager {
     clientDiffer.getElementsToDelete().forEach(client -> deleteClient(client, changes));
     clientDiffer.getElementsToUpdate().forEach(update -> updateClient(update, changes));
 
-    provisionClientScopeAssignments(clients, changes);
+    provisionClientScopeAssignments(clients, scopeIdsByName, changes);
     provisionClientProtocolMappers(clients, changes);
     return changes.result();
   }
@@ -598,22 +598,10 @@ public class RealmManager {
    * An empty list removes every assignment.
    */
   private void provisionClientScopeAssignments(
-      List<ClientRepresentation> clients, Changes changes) {
-    boolean anyScopesConfigured =
-        clients.stream()
-            .anyMatch(
-                client ->
-                    client.getDefaultClientScopes() != null
-                        || client.getOptionalClientScopes() != null);
-    if (!anyScopesConfigured) {
+      List<ClientRepresentation> clients, Map<String, String> scopeIdsByName, Changes changes) {
+    if (!declaresAnyClientScopes(clients)) {
       return;
     }
-
-    Map<String, String> scopeIdsByName =
-        getRealmResource().clientScopes().findAll().stream()
-            .collect(
-                Collectors.toMap(
-                    ClientScopeRepresentation::getName, ClientScopeRepresentation::getId));
 
     for (ClientRepresentation client : clients) {
       getClientByClientId(client.getClientId())
@@ -701,6 +689,21 @@ public class RealmManager {
     ClientRepresentation newClient = update.newState();
     changes.updated(Target.CLIENT, newClient.getClientId(), update.multiLineDiff());
     getRealmResource().clients().get(newClient.getId()).update(newClient);
+  }
+
+  /** An empty list still counts: it means "remove every assignment". */
+  private static boolean declaresAnyClientScopes(List<ClientRepresentation> clients) {
+    return clients.stream()
+        .anyMatch(
+            client ->
+                client.getDefaultClientScopes() != null
+                    || client.getOptionalClientScopes() != null);
+  }
+
+  private Map<String, String> clientScopeIdsByName() {
+    return getRealmResource().clientScopes().findAll().stream()
+        .collect(
+            Collectors.toMap(ClientScopeRepresentation::getName, ClientScopeRepresentation::getId));
   }
 
   private Changes changes() {
