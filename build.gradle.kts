@@ -131,9 +131,9 @@ publishing {
 
                 developers {
                     developer {
-                        id = "cronn"
-                        name = "cronn GmbH"
-                        email = "info@cronn.de"
+                        id = "markus.mueller"
+                        name = "Markus Müller"
+                        email = "markus.mueller@cronn.de"
                     }
                 }
 
