@@ -45,11 +45,11 @@ Maven:
 |-----------------|-----------------|------|
 | 0.x             | 26.x            | 21+  |
 
-Tested against 26.7.3. From `1.0.0` onwards the major version tracks the supported Keycloak major.
+Tested against 26.8.1. From `1.0.0` onwards the major version tracks the supported Keycloak major.
 While `0.x` lasts, a minor release may still break the API.
 
 The bundled `keycloak-admin-client` is an `api` dependency, so you will see it on your classpath at
-version 26.0.12 even against a 26.7 server. That mismatch is expected: since 26.0.0 the client
+version 26.0.12 even against a 26.8 server. That mismatch is expected: since 26.0.0 the client
 libraries release independently and are supported "with the same server version and a few previous
 major server versions" ([release notes][keycloak-client-26]).
 
@@ -567,7 +567,7 @@ supported, and provisioning refuses a realm whose password policy contains `pass
 ## 📋 Requirements
 
 - Java 21+
-- Keycloak 26.x (tested against 26.7.3)
+- Keycloak 26.x (tested against 26.8.1)
 
 ## 🔗 Related Projects
 
