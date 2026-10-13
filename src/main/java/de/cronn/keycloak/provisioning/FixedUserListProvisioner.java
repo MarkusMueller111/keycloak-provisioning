@@ -1,11 +1,6 @@
-package de.cronn.keycloak.provisioning.testsupport;
+package de.cronn.keycloak.provisioning;
 
 import de.cronn.keycloak.provisioning.Change.Target;
-import de.cronn.keycloak.provisioning.Changes;
-import de.cronn.keycloak.provisioning.KeycloakException;
-import de.cronn.keycloak.provisioning.ProvisioningResult;
-import de.cronn.keycloak.provisioning.RealmManager;
-import de.cronn.keycloak.provisioning.UserFields;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserRepresentationDiffer;
 import java.util.List;
@@ -18,27 +13,22 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Provisions a realm's users from a desired list. Kept apart from {@link RealmManager} because
- * users are rarely configuration: a realm that matters gets its accounts from people signing up or
- * from an identity provider, not from a list in a deployment's source code.
+ * Provisions a realm's users from a desired list. Kept apart from {@link RealmManager} because it
+ * only holds for a realm whose user list is fixed: nobody signs up, and no identity provider adds
+ * accounts. A realm that gains users any other way will have them deleted.
  *
- * <p>This is for realms whose whole user list is fixture data — a test container, a demo
- * environment, a seeded local setup. It ships in the main artifact rather than the test fixtures
- * because such realms are usually provisioned by production code running under a test or demo
- * profile.
- *
- * <p>{@link #provisionUsers(List)} takes the full desired state and deletes what is not in it, the
- * same semantics as the other provisioning methods. Users carry no naming prefix though, so unlike
- * the client provisioning there is no fence limiting deletion to accounts this library created: an
- * incomplete list removes real accounts.
+ * <p>{@link #provisionFixedUserList(List)} takes the full desired state and deletes what is not in
+ * it, the same semantics as the other provisioning methods. Users carry no naming prefix though, so
+ * unlike the client provisioning there is no fence limiting deletion to accounts this library
+ * created: an incomplete list removes real accounts.
  */
-public final class TestUserProvisioner {
+public final class FixedUserListProvisioner {
 
-  private static final Logger log = LoggerFactory.getLogger(TestUserProvisioner.class);
+  private static final Logger log = LoggerFactory.getLogger(FixedUserListProvisioner.class);
 
   private final RealmManager realmManager;
 
-  public TestUserProvisioner(RealmManager realmManager) {
+  public FixedUserListProvisioner(RealmManager realmManager) {
     this.realmManager = Objects.requireNonNull(realmManager);
   }
 
@@ -53,12 +43,12 @@ public final class TestUserProvisioner {
    *
    * <p>Usernames and emails have to be lower-case — see {@link UserFields}.
    */
-  public ProvisioningResult provisionUsers(List<UserRepresentation> users) {
+  public ProvisioningResult provisionFixedUserList(List<UserRepresentation> users) {
     users.forEach(user -> UserFields.requireLowerCaseUsername(user.getUsername()));
     users.forEach(user -> UserFields.requireLowerCaseEmail(user.getEmail()));
-    users.forEach(TestUserProvisioner::assertNoMembershipsAreDeclared);
-    users.forEach(TestUserProvisioner::assertOnlyPasswordsAreDeclared);
-    if (users.stream().anyMatch(TestUserProvisioner::declaresCredentials)) {
+    users.forEach(FixedUserListProvisioner::assertNoMembershipsAreDeclared);
+    users.forEach(FixedUserListProvisioner::assertOnlyPasswordsAreDeclared);
+    if (users.stream().anyMatch(FixedUserListProvisioner::declaresCredentials)) {
       assertPasswordsCanBeSetAgain();
     }
 

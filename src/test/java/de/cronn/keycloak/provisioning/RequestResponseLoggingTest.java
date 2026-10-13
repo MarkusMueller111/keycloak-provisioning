@@ -8,7 +8,6 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import de.cronn.assertions.validationfile.normalization.UuidNormalizer;
-import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -119,7 +118,8 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
     user.setCredentials(List.of(password));
 
     withRealmManager(
-        realmManager -> new TestUserProvisioner(realmManager).provisionUsers(List.of(user)));
+        realmManager ->
+            new FixedUserListProvisioner(realmManager).provisionFixedUserList(List.of(user)));
 
     assertThat(messages()).noneMatch(message -> message.contains("Str0ng-P4ssw0rd!"));
   }
