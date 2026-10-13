@@ -1,30 +1,28 @@
 package de.cronn.keycloak.provisioning;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.KeycloakDefaultConnectionConfig;
-import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCredentialsConfig;
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningClientConfig;
 import de.cronn.keycloak.provisioning.connection.client.KeycloakProvisioningConnectionManager;
-import jakarta.ws.rs.NotAuthorizedException;
-import jakarta.ws.rs.WebApplicationException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.junit.jupiter.api.Test;
 import org.keycloak.admin.client.resource.RealmResource;
 import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
-/** Bootstrapping happens once per Keycloak, so every test here needs an untouched one. */
-class ConnectionBootstrapTest extends OwnKeycloakTest {
+/**
+ * Connecting once the provisioning client exists. The first connect creates it, so these share a
+ * Keycloak; what only a Keycloak instance can show lives in {@link FirstConnectBootstrapTest}.
+ */
+class ConnectionBootstrapTest extends SharedKeycloakTest {
 
   private static final KeycloakProvisioningClientConfig CLIENT_CONFIG =
       new KeycloakProvisioningClientConfig("keycloak-provisioning", "secret");
@@ -112,30 +110,6 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
         .toList();
   }
 
-  /**
-   * Before the provisioning client exists nothing can authenticate as it, so the first connect has
-   * to fall back to the bootstrap admin to create it.
-   */
-  @Test
-  void bootstrapsProvisioningClientViaAdminCliOnFirstConnect() throws JsonProcessingException {
-    assertThatThrownBy(() -> new KeycloakProvisioningConnectionManager(serverUrl(), CLIENT_CONFIG))
-        .isInstanceOf(KeycloakException.class)
-        .satisfies(
-            thrown ->
-                assertThat(ExceptionUtils.indexOfType(thrown, NotAuthorizedException.class))
-                    .isNotNegative());
-
-    try (KeycloakAdminCliConnectionManager adminCli =
-        new KeycloakAdminCliConnectionManager(
-            serverUrl(), new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, ADMIN_PASSWORD))) {
-      assertThat(tokenClientId(adminCli)).isEqualTo("admin-cli");
-    }
-
-    try (DefaultKeycloakConnectionManager connectionManager = connectionManager()) {
-      assertThat(tokenClientId(connectionManager)).isEqualTo("keycloak-provisioning");
-    }
-  }
-
   @Test
   void reconnectsAsTheProvisioningClientOnceBootstrapped() throws JsonProcessingException {
     try (DefaultKeycloakConnectionManager first = connectionManager()) {
@@ -164,26 +138,6 @@ class ConnectionBootstrapTest extends OwnKeycloakTest {
 
       assertThat(realmRoleNames(master, serviceAccount)).contains(RealmManager.ADMIN_REALM_ROLE);
     }
-  }
-
-  /**
-   * Both paths fail, so the JAX-RS exception surfaces wrapped and names what was attempted. The
-   * status Keycloak returns for bad admin credentials is not asserted: 26.0 answers 401, 26.7
-   * answers 400.
-   */
-  @Test
-  void reportsABootstrapFailureAsKeycloakException() {
-    KeycloakDefaultConnectionConfig config =
-        new KeycloakDefaultConnectionConfig(
-            serverUrl(),
-            new KeycloakAdminCredentialsConfig(ADMIN_USERNAME, "wrong-password"),
-            CLIENT_CONFIG);
-
-    assertThatThrownBy(() -> new DefaultKeycloakConnectionManager(config))
-        .isInstanceOf(KeycloakException.class)
-        .hasMessageContaining("keycloak-provisioning")
-        .hasMessageContaining(serverUrl())
-        .hasRootCauseInstanceOf(WebApplicationException.class);
   }
 
   private List<String> realmRoleNames(RealmManager realmManager, UserRepresentation user) {
