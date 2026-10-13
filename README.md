@@ -351,9 +351,10 @@ Entries are applied in iteration order, and a sub-flow only exists once the entr
 has run — so use an ordered map and name a flow before the entry that fills it. `Map.of` iterates in
 an unspecified order and will fail with a 404 on some runs and not others.
 
-`providerId` is the flow type and has to be set — `basic-flow` for an ordinary flow. Keycloak
-answers one without it with "Duplicate resource", so `provisionFlows` rejects it before writing
-anything.
+`providerId` is the flow type and has to be set — `basic-flow` for an ordinary flow — and
+`topLevel` has to be `true`. Keycloak answers a flow without a type with "Duplicate resource", and
+stores a flow that is not top-level where no later run can find it again, so `provisionFlows`
+rejects both before writing anything.
 
 > [!IMPORTANT]
 > Only top-level flows go to `provisionFlows`. A `SubFlow` entry creates the nested flow itself, so
