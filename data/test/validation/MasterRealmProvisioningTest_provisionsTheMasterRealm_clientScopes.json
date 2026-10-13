@@ -646,7 +646,6 @@
 }, {
   "attributes" : {
     "include.in.token.scope" : "false",
-    "consent.screen.text" : "",
     "display.on.consent.screen" : "false"
   },
   "description" : "OpenID Connect scope for add allowed web origins to the access token",
