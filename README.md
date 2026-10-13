@@ -319,7 +319,7 @@ connection is opened.
 | `provisionRequiredActions` | unregisters every required action not in the list — an empty list means "not declared" here, so Keycloak's own are left alone |
 | `provisionBuiltInClients` | resets every client Keycloak provides that is not in the list to its hardened default, which for `broker` and `admin-cli` means disabled |
 | `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list                                                          |
-| `TestUserProvisioner.provisionUsers` | deletes **every user in the realm** that is not in the list — see [below](#provisioning-test-users-with-testuserprovisioner) |
+| `FixedUserListProvisioner.provisionFixedUserList` | deletes **every user in the realm** that is not in the list — see [below](#provisioning-a-fixed-user-list-with-fixeduserlistprovisioner) |
 
 ### 🔐 Authentication flows
 
@@ -466,7 +466,7 @@ keeps it away from anything you did not provision.
 > [!WARNING]
 > The prefix fences clients and client scopes — **not flows or users**. `provisionFlows` is bounded
 > by Keycloak's own built-in flag, so every flow it did not create is in scope, including ones made
-> by hand in the admin console. `provisionUsers` has no fence at all.
+> by hand in the admin console. `provisionFixedUserList` has no fence at all.
 
 ```java
 ManagedNaming.standard()                                     // clients, groups, roles, scopes
@@ -541,18 +541,17 @@ authenticate against the realm as your configuration leaves it.
 > provisioning client, via an admin that has an email address, or with a user profile that does not
 > require one.
 
-## 🧪 Provisioning test users with `TestUserProvisioner`
+## 👥 Provisioning a fixed user list with `FixedUserListProvisioner`
 
-User provisioning lives in `TestUserProvisioner` rather than on `RealmManager`, because a user
-list is rarely configuration: a realm that matters gets its accounts from people signing up or from
-an identity provider, not from a list in your source code.
+User provisioning lives in `FixedUserListProvisioner` rather than on `RealmManager`, because it
+only holds for a realm whose user list is fixed: nobody signs up, and no identity provider adds
+accounts.
 
 ```java
-new TestUserProvisioner(realmManager).provisionUsers(List.of(testUser));
+new FixedUserListProvisioner(realmManager).provisionFixedUserList(List.of(user));
 ```
 
-Use it for realms whose whole user list is fixture data — a test container, a demo environment, a
-seeded local setup.
+A realm that gains users any other way will have them deleted on the next run.
 
 > [!CAUTION]
 > Users carry no naming prefix, so this is the one provisioning method with no fence at all: every

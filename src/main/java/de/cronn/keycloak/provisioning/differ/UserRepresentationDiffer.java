@@ -23,7 +23,8 @@ public class UserRepresentationDiffer extends AbstractDiffer<UserRepresentation>
       // An update replaces the attributes the user profile manages, so {} removes them all.
       target.setAttributes(orDefault(source.getAttributes(), target.getAttributes(), Map.of()));
       // Credentials are left out: Keycloak never returns their value, so a diff could not see a
-      // change. TestUserProvisioner applies them separately whenever a desired user carries any.
+      // change. FixedUserListProvisioner applies them separately whenever a desired user carries
+      // any.
     };
   }
 

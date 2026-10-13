@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.tuple;
 
 import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.Change.Type;
-import de.cronn.keycloak.provisioning.testsupport.TestUserProvisioner;
 import java.util.List;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -20,14 +19,15 @@ import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
-class UserProvisioningTest extends SharedKeycloakTest {
+class FixedUserListProvisioningTest extends SharedKeycloakTest {
 
   private static final String PASSWORD = "Str0ng-P4ssw0rd!";
   private static final String LOGIN_CLIENT = "login";
 
   @Test
   void createsTheConfiguredUsers() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
+    withFixedUserListProvisioner(
+        p -> p.provisionFixedUserList(List.of(user("alice"), user("bob"))));
 
     assertThat(usernames()).contains("alice", "bob");
   }
@@ -38,16 +38,16 @@ class UserProvisioningTest extends SharedKeycloakTest {
     initial.setEnabled(true);
     initial.setEmailVerified(true);
     initial.setFirstName("Alice");
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(initial)));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(initial)));
 
     UserRepresentation changed = user("alice");
     changed.setEnabled(false);
     changed.setEmailVerified(false);
     changed.setFirstName("Alicia");
     changed.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withTestUserProvisioner(
+    withFixedUserListProvisioner(
         p ->
-            assertThat(p.provisionUsers(List.of(changed)).changes())
+            assertThat(p.provisionFixedUserList(List.of(changed)).changes())
                 .extracting(Change::target, Change::name, Change::type)
                 .containsExactly(tuple(Target.USER, "alice", Type.UPDATED)));
 
@@ -64,9 +64,9 @@ class UserProvisioningTest extends SharedKeycloakTest {
     declared.setFirstName("Alice");
     declared.setEmailVerified(true);
     declared.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(declared)));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(declared)));
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
 
     UserRepresentation actual = findUser("alice");
     assertThat(actual.getFirstName()).isNull();
@@ -76,39 +76,41 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void deletesUsersThatAreNoLongerConfigured() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"), user("bob"))));
+    withFixedUserListProvisioner(
+        p -> p.provisionFixedUserList(List.of(user("alice"), user("bob"))));
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
 
     assertThat(usernames()).containsExactly("alice");
   }
 
   @Test
   void sendsNoWritesWhenRerunUnchanged() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
 
-    withTestUserProvisioner(
-        p -> assertChangesNothing(() -> p.provisionUsers(List.of(user("alice")))));
+    withFixedUserListProvisioner(
+        p -> assertChangesNothing(() -> p.provisionFixedUserList(List.of(user("alice")))));
   }
 
   @Test
   void sendsNoWritesWhenAUserDeclaringNoEnabledFlagIsRerun() {
     UserRepresentation undeclared = user("alice");
     undeclared.setEnabled(null);
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(undeclared)));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(undeclared)));
 
-    withTestUserProvisioner(p -> assertChangesNothing(() -> p.provisionUsers(List.of(undeclared))));
+    withFixedUserListProvisioner(
+        p -> assertChangesNothing(() -> p.provisionFixedUserList(List.of(undeclared))));
   }
 
   @Test
   void sendsOnlyThePasswordResetWhenRerunWithAPassword() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
 
-    withTestUserProvisioner(
+    withFixedUserListProvisioner(
         p ->
             assertThat(
                     assertSendsOnlyWrites(
-                            () -> p.provisionUsers(List.of(userWithPassword("alice"))),
+                            () -> p.provisionFixedUserList(List.of(userWithPassword("alice"))),
                             "PUT /admin/realms/test/users/<id>/reset-password")
                         .changes())
                 .extracting(Change::target, Change::name, Change::type)
@@ -117,30 +119,30 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void setsAPasswordThatCanBeUsedToLogIn() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
 
     assertThat(logIn("alice", PASSWORD)).isNotBlank();
   }
 
   @Test
   void setsANewUsersPasswordOnlyThroughItsCreation() {
-    withTestUserProvisioner(
+    withFixedUserListProvisioner(
         p ->
             assertSendsOnlyWrites(
-                () -> p.provisionUsers(List.of(userWithPassword("alice"))),
+                () -> p.provisionFixedUserList(List.of(userWithPassword("alice"))),
                 "POST /admin/realms/test/users"));
   }
 
   @Test
   void restoresAPasswordChangedOutOfBand() {
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
     adminClient()
         .realm(REALM)
         .users()
         .get(findUser("alice").getId())
         .resetPassword(password("Ch4nged-P4ssw0rd!"));
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
 
     assertThat(logIn("alice", PASSWORD)).isNotBlank();
   }
@@ -155,12 +157,13 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
     assertThatThrownBy(
             () ->
-                withTestUserProvisioner(p -> p.provisionUsers(List.of(userWithPassword("alice")))))
+                withFixedUserListProvisioner(
+                    p -> p.provisionFixedUserList(List.of(userWithPassword("alice")))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining(policy.substring(0, policy.indexOf('(')));
     assertThat(usernames()).doesNotContain("alice");
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("bob"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("bob"))));
     assertThat(usernames()).contains("bob");
   }
 
@@ -173,7 +176,8 @@ class UserProvisioningTest extends SharedKeycloakTest {
     otp.setValue("123456");
     withOtp.setCredentials(List.of(otp));
 
-    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withOtp))))
+    assertThatThrownBy(
+            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withOtp))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("otp");
     assertThat(usernames()).doesNotContain("alice");
@@ -181,7 +185,9 @@ class UserProvisioningTest extends SharedKeycloakTest {
 
   @Test
   void rejectsAMixedCaseUsername() {
-    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(user("Alice")))))
+    assertThatThrownBy(
+            () ->
+                withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("Alice")))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("lower-case")
         .hasMessageContaining("Alice");
@@ -200,7 +206,7 @@ class UserProvisioningTest extends SharedKeycloakTest {
     withRealmManager(rm -> rm.provisionManagedClients(List.of(serviceAccountClient)));
     String serviceAccountId = serviceAccountUserId();
 
-    withTestUserProvisioner(p -> p.provisionUsers(List.of(user("alice"))));
+    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
 
     assertThat(serviceAccountUserId()).isEqualTo(serviceAccountId);
   }
@@ -222,22 +228,24 @@ class UserProvisioningTest extends SharedKeycloakTest {
     UserRepresentation withRoles = user("alice");
     withRoles.setRealmRoles(List.of("some-role"));
 
-    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withRoles))))
+    assertThatThrownBy(
+            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withRoles))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("realmRoles");
 
     UserRepresentation withGroups = user("bob");
     withGroups.setGroups(List.of("some-group"));
 
-    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(withGroups))))
+    assertThatThrownBy(
+            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withGroups))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("groups");
 
     assertThat(usernames()).doesNotContain("alice", "bob");
   }
 
-  private void withTestUserProvisioner(Consumer<TestUserProvisioner> action) {
-    withRealmManager(realmManager -> action.accept(new TestUserProvisioner(realmManager)));
+  private void withFixedUserListProvisioner(Consumer<FixedUserListProvisioner> action) {
+    withRealmManager(realmManager -> action.accept(new FixedUserListProvisioner(realmManager)));
   }
 
   /** Keycloak lower-cases a stored email, so a mixed-case one is never what the realm holds. */
@@ -246,7 +254,8 @@ class UserProvisioningTest extends SharedKeycloakTest {
     UserRepresentation mixedCase = user("alice");
     mixedCase.setEmail("Alice@Example.com");
 
-    assertThatThrownBy(() -> withTestUserProvisioner(p -> p.provisionUsers(List.of(mixedCase))))
+    assertThatThrownBy(
+            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(mixedCase))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("email")
         .hasMessageContaining("Alice@Example.com");
