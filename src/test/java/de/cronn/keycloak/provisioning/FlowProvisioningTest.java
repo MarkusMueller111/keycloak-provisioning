@@ -361,6 +361,23 @@ class FlowProvisioningTest extends SharedKeycloakTest {
                         new FlowExecution.SubFlow("nested", "a nested flow", null)))));
   }
 
+  /** Keycloak creates it but leaves it out of getFlows(), so no later run can see it again. */
+  @Test
+  void rejectsAFlowThatIsNotTopLevel() {
+    AuthenticationFlowRepresentation nested = flow("nested-flow", "a nested flow");
+    nested.setTopLevel(false);
+
+    assertThatThrownBy(
+            () ->
+                withRealmManager(
+                    rm -> rm.provisionFlows(List.of(flow(FLOW, "a test flow"), nested))))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("nested-flow")
+        .hasMessageContaining("top-level");
+
+    assertThat(flowAliases()).doesNotContain("nested-flow", FLOW);
+  }
+
   /** Keycloak's own answer is a 409 "Duplicate resource", which names the wrong problem. */
   @Test
   void rejectsAFlowWithoutAType() {

@@ -834,6 +834,7 @@ public class RealmManager {
    */
   public ProvisioningResult provisionFlows(List<AuthenticationFlowRepresentation> flows) {
     flows.forEach(RealmManager::assertFlowTypeIsDeclared);
+    flows.forEach(RealmManager::assertFlowIsTopLevel);
     Changes changes = changes();
     List<AuthenticationFlowRepresentation> existingFlows =
         getRealmResource().flows().getFlows().stream()
@@ -859,6 +860,18 @@ public class RealmManager {
     Validate.isTrue(
         StringUtils.isNotBlank(flow.getProviderId()),
         "Flow '%s' declares no providerId. Set the flow type, 'basic-flow' for an ordinary one.",
+        flow.getAlias());
+  }
+
+  /**
+   * Keycloak creates a flow that is not top-level, but leaves it out of {@code getFlows()}, so
+   * every later run takes it for missing and answers the next create with "Duplicate resource".
+   */
+  private static void assertFlowIsTopLevel(AuthenticationFlowRepresentation flow) {
+    Validate.isTrue(
+        flow.isTopLevel(),
+        "Flow '%s' is not top-level. Only top-level flows go here; a nested one is created by the"
+            + " SubFlow entry that declares it.",
         flow.getAlias());
   }
 
