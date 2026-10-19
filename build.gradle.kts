@@ -32,14 +32,13 @@ repositories {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
     consistentResolution {
         useRuntimeClasspathVersions()
     }
 }
 
 tasks.withType<JavaCompile> {
+    options.release = 21
     options.encoding = "UTF-8"
     options.compilerArgs.addAll(listOf("-Xlint:all", "-Werror"))
 }
