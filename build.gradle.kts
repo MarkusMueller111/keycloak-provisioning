@@ -34,6 +34,9 @@ repositories {
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+    consistentResolution {
+        useRuntimeClasspathVersions()
+    }
 }
 
 tasks.withType<JavaCompile> {
@@ -150,10 +153,7 @@ publishing {
             }
 
             versionMapping {
-                usage("java-api") {
-                    fromResolutionOf("runtimeClasspath")
-                }
-                usage("java-runtime") {
+                allVariants {
                     fromResolutionResult()
                 }
             }
