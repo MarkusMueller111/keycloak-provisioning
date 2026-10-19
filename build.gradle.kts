@@ -2,6 +2,13 @@ buildscript {
     repositories {
         mavenCentral()
     }
+    configurations.classpath {
+        resolutionStrategy {
+            // JGit 7 (pulled in by Spotless) removed GpgObjectSigner, which JReleaser still needs:
+            // https://github.com/jreleaser/jreleaser/issues/1643
+            force("org.eclipse.jgit:org.eclipse.jgit:6.10.0.202406032230-r")
+        }
+    }
     dependencyLocking {
         lockAllConfigurations()
     }
