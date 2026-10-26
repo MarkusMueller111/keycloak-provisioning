@@ -140,6 +140,38 @@ Every connection manager acquires a token in its constructor, so a misconfigured
 where you open it rather than on some later call. Failures are reported as `KeycloakException` with
 the underlying `jakarta.ws.rs` exception as cause.
 
+### 🔐 DPoP-bound tokens
+
+`KeycloakProvisioningClientConfig.builder(...).useDPoP(true)` requests DPoP-bound access tokens for the
+provisioning client's own connection and registers the client with
+`dpop.bound.access.tokens=true`, so a stolen token cannot be replayed without the private key that
+proved possession of it. Off by default, to leave existing consumers unaffected.
+
+```java
+KeycloakProvisioningClientConfig.builder("keycloak-provisioning", clientSecret)
+    .useDPoP(true)
+    .build();
+```
+
+DPoP needs a crypto provider on the runtime classpath to generate its key pair, which the admin
+client does not bring on its own — add `org.keycloak:keycloak-crypto-default` (or an equivalent,
+such as a FIPS provider) as a runtime dependency when you enable it
+([keycloak/keycloak#27916](https://github.com/keycloak/keycloak/issues/27916)).
+
+### 🌐 Customizing the HTTP client
+
+`KeycloakDefaultConnectionConfig.builder(...).httpClientCustomizer(...)` runs a `Consumer<ResteasyClientBuilder>`
+against every connection's HTTP client, after this library's own registrations (timeouts, request
+logging) — use it to register a `ClientRequestFilter`, such as one that propagates tracing headers,
+or to otherwise tune the underlying Resteasy client. A no-op by default. Custom
+`KeycloakConnectionManager` implementations pass it on to `getDefaultKeycloakBuilder(...)`.
+
+```java
+KeycloakDefaultConnectionConfig.builder(serverUrl, adminCredentials, provisioningClientConfig)
+    .httpClientCustomizer(builder -> builder.register(new MyTracingFilter()))
+    .build();
+```
+
 ## 🏛️ Provisioning an application realm
 
 `AppRealmProvisioner` creates a realm and keeps its realm-level settings in sync:

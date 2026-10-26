@@ -2,6 +2,7 @@ package de.cronn.keycloak.provisioning.connection.client;
 
 import de.cronn.keycloak.provisioning.RealmManager;
 import java.util.List;
+import java.util.Map;
 import org.keycloak.admin.client.resource.RoleScopeResource;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -17,6 +18,8 @@ import org.slf4j.LoggerFactory;
 public final class ProvisioningClientBootstrapper {
 
   private static final Logger log = LoggerFactory.getLogger(ProvisioningClientBootstrapper.class);
+
+  private static final String DPOP_BOUND_ACCESS_TOKENS_ATTRIBUTE = "dpop.bound.access.tokens";
 
   private ProvisioningClientBootstrapper() {}
 
@@ -67,6 +70,9 @@ public final class ProvisioningClientBootstrapper {
     // A service account that never issues user tokens has no use for the realm's default scopes.
     client.setDefaultClientScopes(List.of());
     client.setOptionalClientScopes(List.of());
+    if (provisioningClientConfig.useDPoP()) {
+      client.setAttributes(Map.of(DPOP_BOUND_ACCESS_TOKENS_ATTRIBUTE, "true"));
+    }
 
     return client;
   }

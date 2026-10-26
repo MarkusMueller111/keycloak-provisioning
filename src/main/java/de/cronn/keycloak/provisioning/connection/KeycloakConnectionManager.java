@@ -7,6 +7,8 @@ import jakarta.ws.rs.client.Client;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
+import org.jboss.resteasy.client.jaxrs.ResteasyClientBuilder;
 import org.jboss.resteasy.client.jaxrs.internal.ResteasyClientBuilderImpl;
 import org.keycloak.admin.client.JacksonProvider;
 import org.keycloak.admin.client.Keycloak;
@@ -49,24 +51,33 @@ public abstract class KeycloakConnectionManager implements AutoCloseable {
     }
   }
 
-  protected static KeycloakBuilder getDefaultKeycloakBuilder(String serverUrl) {
+  /**
+   * {@code httpClientCustomizer} runs after this library's own registrations (timeouts, request
+   * logging), so it can add further ones, such as a {@code ClientRequestFilter} to propagate
+   * tracing.
+   */
+  protected static KeycloakBuilder getDefaultKeycloakBuilder(
+      String serverUrl, Consumer<ResteasyClientBuilder> httpClientCustomizer) {
     return KeycloakBuilder.builder()
-        .resteasyClient(createClientWithTimeout())
+        .resteasyClient(createClientWithTimeout(httpClientCustomizer))
         .serverUrl(serverUrl)
         .realm("master");
   }
 
-  private static Client createClientWithTimeout() {
-    return new ResteasyClientBuilderImpl()
-        .connectTimeout(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
-        .readTimeout(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
-        // Keycloak does use the JacksonProvider when initializing the default rest easy client, so
-        // we will too
-        // see: /org/keycloak/admin/client/spi/ResteasyClientClassicProvider.java:38
-        .register(JacksonProvider.class, 100)
-        .register(new KeycloakRequestLogger())
-        .register(new KeycloakResponseLogger())
-        .build();
+  private static Client createClientWithTimeout(
+      Consumer<ResteasyClientBuilder> httpClientCustomizer) {
+    ResteasyClientBuilderImpl clientBuilder =
+        new ResteasyClientBuilderImpl()
+            .connectTimeout(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+            .readTimeout(TIMEOUT.toMillis(), TimeUnit.MILLISECONDS)
+            // Keycloak does use the JacksonProvider when initializing the default rest easy
+            // client, so we will too
+            // see: /org/keycloak/admin/client/spi/ResteasyClientClassicProvider.java:38
+            .register(JacksonProvider.class, 100)
+            .register(new KeycloakRequestLogger())
+            .register(new KeycloakResponseLogger());
+    httpClientCustomizer.accept(clientBuilder);
+    return clientBuilder.build();
   }
 
   public abstract Keycloak getKeycloakClient();
