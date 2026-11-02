@@ -39,6 +39,31 @@ Maven:
 </dependency>
 ```
 
+## 🧭 Contents
+
+- [Versioning](#-versioning)
+- [Getting started](#-getting-started)
+- [Connecting](#-connecting)
+  - [DPoP-bound tokens](#-dpop-bound-tokens)
+  - [Customizing the HTTP client](#-customizing-the-http-client)
+- [Provisioning an application realm](#️-provisioning-an-application-realm)
+- [Hardening the master realm](#-hardening-the-master-realm)
+  - [Permanent admin](#-permanent-admin)
+  - [Temporary admins](#-temporary-admins)
+  - [admin-cli](#-admin-cli)
+  - [Recovery](#-recovery)
+- [Provisioning](#️-provisioning)
+  - [Authentication flows](#-authentication-flows)
+  - [The user profile](#-the-user-profile)
+  - [Keycloak's own clients](#-keycloaks-own-clients)
+  - [Client hardening](#️-client-hardening)
+  - [Client scopes](#-client-scopes)
+  - [Naming](#️-naming)
+- [Test fixtures](#-test-fixtures)
+- [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
+- [Requirements](#-requirements)
+- [Related Projects](#-related-projects)
+
 ## 🔢 Versioning
 
 | Library Version | Keycloak Server | Java |
@@ -107,7 +132,7 @@ from the list and re-run, and it is deleted — that is the whole model.
 
 > [!WARNING]
 > `provisionManagedClients` takes the **full** list of clients you manage, not a list of additions.
-> The same goes for every other `provision*` method. See [Provisioning](#provisioning) for what each
+> The same goes for every other `provision*` method. See [Provisioning](#️-provisioning) for what each
 > one resets.
 
 ## 🔌 Connecting
@@ -255,7 +280,7 @@ and with it any comparison your application makes against a token's `preferred_u
 `PermanentAdmin.none()` skips the admin entirely. Together with the default
 `deleteTemporaryAdmins(true)` that deliberately leaves the realm without administrative access,
 for deployments that do not want a standing human admin — create one on demand with `kc.sh
-bootstrap-admin user` when it is actually needed (see [Recovery](#recovery)).
+bootstrap-admin user` when it is actually needed (see [Recovery](#-recovery)).
 
 ### ⏳ Temporary admins
 
@@ -351,7 +376,7 @@ connection is opened.
 | `provisionRequiredActions` | unregisters every required action not in the list — an empty list means "not declared" here, so Keycloak's own are left alone |
 | `provisionBuiltInClients` | resets every client Keycloak provides that is not in the list to its hardened default, which for `broker` and `admin-cli` means disabled |
 | `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list                                                          |
-| `FixedUserListProvisioner.provisionFixedUserList` | deletes **every user in the realm** that is not in the list — see [below](#provisioning-a-fixed-user-list-with-fixeduserlistprovisioner) |
+| `FixedUserListProvisioner.provisionFixedUserList` | deletes **every user in the realm** that is not in the list — see [below](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner) |
 
 ### 🔐 Authentication flows
 
