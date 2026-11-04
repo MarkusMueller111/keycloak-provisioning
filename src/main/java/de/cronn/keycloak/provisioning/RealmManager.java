@@ -12,6 +12,7 @@ import de.cronn.keycloak.provisioning.differ.Differ;
 import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
+import de.cronn.keycloak.provisioning.differ.UserRepresentationDiffer;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
@@ -71,6 +72,8 @@ public class RealmManager {
   private static final Logger log = LoggerFactory.getLogger(RealmManager.class);
 
   public static final String ADMIN_REALM_ROLE = "admin";
+
+  private static final int USER_PAGE_SIZE = 100;
 
   private static final String POST_LOGOUT_REDIRECT_URIS_ATTRIBUTE = "post.logout.redirect.uris";
   private static final String TEMPORARY_ADMIN_ATTRIBUTE = "is_temporary_admin";
@@ -564,6 +567,131 @@ public class RealmManager {
         null,
         groupsResource::add);
     return changes.result();
+  }
+
+  /**
+   * Provisions the users whose username carries the configured prefix, matched by username: missing
+   * ones are created, existing ones updated, and every other prefixed user is deleted. Users
+   * without the prefix — created on demand, by sign-up or by an identity provider — are never
+   * touched.
+   *
+   * <p>A declared password is set again on every run, which restores one changed out of band:
+   * Keycloak never returns its value, so there is no way to tell whether it still matches. A
+   * temporary one therefore asks for a new password again after every run. Only passwords are
+   * supported, and not in a realm whose password policy forbids reusing one.
+   *
+   * <p>Usernames and emails have to be lower-case — see {@link UserFields}.
+   */
+  public ProvisioningResult provisionManagedUsers(List<UserRepresentation> users) {
+    users.forEach(this::assertUserIsManaged);
+    users.forEach(user -> UserFields.requireLowerCaseUsername(user.getUsername()));
+    users.forEach(user -> UserFields.requireLowerCaseEmail(user.getEmail()));
+    users.forEach(UserFields::requireNoMembershipsDeclared);
+    users.forEach(UserFields::requireOnlyPasswordsDeclared);
+    if (users.stream().anyMatch(RealmManager::declaresCredentials)) {
+      assertPasswordsCanBeSetAgain();
+    }
+    Changes changes = changes();
+
+    List<UserRepresentation> existingUsers = getManagedUsers();
+    UserRepresentationDiffer differ = new UserRepresentationDiffer(existingUsers, users);
+    // A new user gets its password from the create request.
+    for (UserRepresentation user : differ.getElementsToAdd()) {
+      changes.added(Target.USER, user.getUsername());
+      createUser(user);
+    }
+    for (UserRepresentation user : differ.getElementsToDelete()) {
+      changes.removed(Target.USER, user.getUsername());
+      deleteUser(user.getId());
+    }
+    for (ToUpdate<UserRepresentation> update : differ.getElementsToUpdate()) {
+      UserRepresentation user = update.newState();
+      changes.updated(Target.USER, user.getUsername(), update.multiLineDiff());
+      getUserResource(user.getId()).update(user);
+    }
+
+    Set<String> created =
+        differ.getElementsToAdd().stream()
+            .map(UserRepresentation::getUsername)
+            .collect(Collectors.toSet());
+    users.stream()
+        .filter(user -> !created.contains(user.getUsername()))
+        .forEach(user -> resetPasswords(user, changes));
+    return changes.result();
+  }
+
+  /**
+   * Reads only the users whose username contains the prefix, page by page, so a realm with many
+   * other users is not loaded in full. Keycloak matches the username anywhere, hence the filter.
+   * Service accounts are never listed, so the connection's own is safe.
+   */
+  private List<UserRepresentation> getManagedUsers() {
+    String prefix = clientNaming.prefix(ManagedNaming.ManagedEntity.USER);
+    List<UserRepresentation> managed = new ArrayList<>();
+    for (int first = 0; ; first += USER_PAGE_SIZE) {
+      List<UserRepresentation> page =
+          getRealmResource()
+              .users()
+              .search(prefix, null, null, null, first, USER_PAGE_SIZE, null, false);
+      page.stream().filter(clientNaming::isManaged).forEach(managed::add);
+      if (page.size() < USER_PAGE_SIZE) {
+        return managed;
+      }
+    }
+  }
+
+  /**
+   * Without the prefix a user would be created but never recognized as existing again, so the next
+   * run would fail with a conflict.
+   */
+  private void assertUserIsManaged(UserRepresentation user) {
+    if (!clientNaming.isManaged(user)) {
+      throw new KeycloakException(
+          "User '"
+              + user.getUsername()
+              + "' cannot be provisioned: its username must carry the configured prefix '"
+              + clientNaming.prefix(ManagedNaming.ManagedEntity.USER)
+              + "'. Use ManagedNaming.username(...) to build it.");
+    }
+  }
+
+  private static boolean declaresCredentials(UserRepresentation user) {
+    return user.getCredentials() != null && !user.getCredentials().isEmpty();
+  }
+
+  /** Both reject a reset to the current password, so the next run could never set it again. */
+  private void assertPasswordsCanBeSetAgain() {
+    String passwordPolicy = getRealmResource().toRepresentation().getPasswordPolicy();
+    if (passwordPolicy == null) {
+      return;
+    }
+    for (String policy : List.of("passwordHistory", "passwordAge")) {
+      if (passwordPolicy.contains(policy + "(")) {
+        throw new KeycloakException(
+            "Realm '"
+                + realmName
+                + "' has the password policy '"
+                + policy
+                + "', which forbids setting a password again. Remove it, or declare no passwords:"
+                + " provisioning sets every declared password again on each run.");
+      }
+    }
+  }
+
+  private void resetPasswords(UserRepresentation desiredUser, Changes changes) {
+    if (!declaresCredentials(desiredUser)) {
+      return;
+    }
+    getUserResourceByUsername(desiredUser.getUsername())
+        .ifPresent(
+            userResource ->
+                desiredUser
+                    .getCredentials()
+                    .forEach(
+                        credential -> {
+                          changes.updated(Target.PASSWORD, desiredUser.getUsername(), null);
+                          userResource.resetPassword(credential);
+                        }));
   }
 
   private void provisionClientScopeProtocolMappers(

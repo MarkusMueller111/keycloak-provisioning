@@ -1,0 +1,33 @@
+[ {
+  "access" : {
+    "manage" : true
+  },
+  "applicationRoles" : null,
+  "attributes" : null,
+  "clientConsents" : null,
+  "clientRoles" : null,
+  "createdTimestamp" : "[createdTimestamp]",
+  "credentials" : null,
+  "disableableCredentialTypes" : [ ],
+  "email" : "system-alice@example.com",
+  "emailVerified" : false,
+  "enabled" : true,
+  "federatedIdentities" : null,
+  "federationLink" : null,
+  "firstName" : null,
+  "groups" : null,
+  "id" : "[id]",
+  "issuedVerifiableCredentials" : null,
+  "lastName" : null,
+  "notBefore" : 0,
+  "origin" : null,
+  "realmRoles" : [ "default-roles-test" ],
+  "requiredActions" : [ ],
+  "self" : null,
+  "serviceAccountClientId" : null,
+  "socialLinks" : null,
+  "totp" : false,
+  "userProfileMetadata" : null,
+  "username" : "system-alice",
+  "verifiableCredentials" : null
+} ]

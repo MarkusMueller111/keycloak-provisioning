@@ -70,12 +70,21 @@ class ManagedNamingTest {
 
   @Test
   void appliesCustomPrefixesPerKind() {
-    ManagedNaming custom = ManagedNaming.custom("c-", "g-", "r-", "s-");
+    ManagedNaming custom = ManagedNaming.custom("c-", "g-", "r-", "s-", "u-");
 
     assertThat(custom.clientId("web").value()).isEqualTo("c-web");
+    assertThat(custom.username("alice").value()).isEqualTo("u-alice");
     assertThat(custom.groupName("Editors").value()).isEqualTo("g-Editors");
     assertThat(custom.roleName("admin").value()).isEqualTo("r-admin");
     assertThat(custom.isManaged(client("system-web"))).isFalse();
+  }
+
+  /** Keycloak stores usernames lower-cased, so such a prefix would never match a stored one. */
+  @Test
+  void rejectsAnUpperCaseUserPrefix() {
+    assertThatThrownBy(() -> ManagedNaming.custom("c-", "g-", "r-", "s-", "U-"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("lower-case");
   }
 
   private static ClientRepresentation client(String clientId) {

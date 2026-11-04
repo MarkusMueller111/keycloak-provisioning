@@ -49,8 +49,8 @@ no differ reports.
    logs the change, so do not log writes separately.
 
 The fence is what keeps deletion away from objects this library did not create. `ManagedNaming`
-mints prefixed names for clients, client scopes, groups and roles; flows are fenced only by
-Keycloak's own built-in flag, and users not at all.
+mints prefixed names for clients, client scopes, groups, roles and users; flows are fenced only by
+Keycloak's own built-in flag.
 
 > [!CAUTION]
 > Before provisioning a new entity type, work out what a Keycloak built-in of that type

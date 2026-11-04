@@ -7,7 +7,7 @@ import static org.assertj.core.api.Assertions.tuple;
 import de.cronn.keycloak.provisioning.Change.Target;
 import de.cronn.keycloak.provisioning.Change.Type;
 import java.util.List;
-import java.util.function.Consumer;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -19,132 +19,166 @@ import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
 
-class FixedUserListProvisioningTest extends SharedKeycloakTest {
+class UserProvisioningTest extends SharedKeycloakTest {
 
   private static final String PASSWORD = "Str0ng-P4ssw0rd!";
   private static final String LOGIN_CLIENT = "login";
 
   @Test
   void createsTheConfiguredUsers() {
-    withFixedUserListProvisioner(
-        p -> p.provisionFixedUserList(List.of(user("alice"), user("bob"))));
+    withRealmManager(
+        p -> p.provisionManagedUsers(List.of(user("system-alice"), user("system-bob"))));
 
-    assertThat(usernames()).contains("alice", "bob");
+    assertThat(usernames()).contains("system-alice", "system-bob");
   }
 
   @Test
   void provisionsUserFieldsOnUpdate() {
-    UserRepresentation initial = user("alice");
+    UserRepresentation initial = user("system-alice");
     initial.setEnabled(true);
     initial.setEmailVerified(true);
     initial.setFirstName("Alice");
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(initial)));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(initial)));
 
-    UserRepresentation changed = user("alice");
+    UserRepresentation changed = user("system-alice");
     changed.setEnabled(false);
     changed.setEmailVerified(false);
     changed.setFirstName("Alicia");
     changed.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withFixedUserListProvisioner(
+    withRealmManager(
         p ->
-            assertThat(p.provisionFixedUserList(List.of(changed)).changes())
+            assertThat(p.provisionManagedUsers(List.of(changed)).changes())
                 .extracting(Change::target, Change::name, Change::type)
-                .containsExactly(tuple(Target.USER, "alice", Type.UPDATED)));
+                .containsExactly(tuple(Target.USER, "system-alice", Type.UPDATED)));
 
-    UserRepresentation actual = findUser("alice");
-    assertThat(actual.isEnabled()).isFalse();
-    assertThat(actual.isEmailVerified()).isFalse();
-    assertThat(actual.getFirstName()).isEqualTo("Alicia");
-    assertThat(actual.getRequiredActions()).containsExactly("UPDATE_PASSWORD");
+    withRealmManager(this::validateUsers);
   }
 
   @Test
   void restoresKeycloaksDefaultsWhenDeclarationsAreRemoved() {
-    UserRepresentation declared = user("alice");
+    UserRepresentation declared = user("system-alice");
     declared.setFirstName("Alice");
     declared.setEmailVerified(true);
     declared.setRequiredActions(List.of("UPDATE_PASSWORD"));
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(declared)));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(declared)));
 
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-alice"))));
 
-    UserRepresentation actual = findUser("alice");
-    assertThat(actual.getFirstName()).isNull();
-    assertThat(actual.isEmailVerified()).isFalse();
-    assertThat(actual.getRequiredActions()).isEmpty();
+    withRealmManager(this::validateUsers);
   }
 
   @Test
   void deletesUsersThatAreNoLongerConfigured() {
-    withFixedUserListProvisioner(
-        p -> p.provisionFixedUserList(List.of(user("alice"), user("bob"))));
+    withRealmManager(
+        p -> p.provisionManagedUsers(List.of(user("system-alice"), user("system-bob"))));
 
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-alice"))));
 
-    assertThat(usernames()).containsExactly("alice");
+    assertThat(usernames()).containsExactly("system-alice");
+  }
+
+  @Test
+  void leavesUsersWithoutThePrefixAlone() {
+    UserRepresentation unmanaged = user("carol");
+    adminClient().realm(REALM).users().create(unmanaged).close();
+
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-alice"))));
+
+    assertThat(usernames()).containsExactlyInAnyOrder("carol", "system-alice");
+  }
+
+  @Test
+  void leavesAUserAloneWhoseOtherFieldsStartWithThePrefix() {
+    UserRepresentation dave = user("dave");
+    dave.setFirstName("system-dave");
+    dave.setEmail("system-dave@example.com");
+    adminClient().realm(REALM).users().create(dave).close();
+
+    withRealmManager(p -> p.provisionManagedUsers(List.of()));
+
+    assertThat(usernames()).containsExactly("dave");
+  }
+
+  @Test
+  void seesManagedUsersBeyondTheFirstPage() {
+    List<UserRepresentation> users =
+        IntStream.rangeClosed(1, 101).mapToObj(i -> user("system-user-%03d".formatted(i))).toList();
+    withRealmManager(p -> p.provisionManagedUsers(users));
+
+    withRealmManager(p -> assertChangesNothing(() -> p.provisionManagedUsers(users)));
+  }
+
+  @Test
+  void rejectsAUserWithoutThePrefix() {
+    assertThatThrownBy(() -> withRealmManager(p -> p.provisionManagedUsers(List.of(user("carol")))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("carol")
+        .hasMessageContaining("system-");
+
+    assertThat(usernames()).doesNotContain("carol");
   }
 
   @Test
   void sendsNoWritesWhenRerunUnchanged() {
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-alice"))));
 
-    withFixedUserListProvisioner(
-        p -> assertChangesNothing(() -> p.provisionFixedUserList(List.of(user("alice")))));
+    withRealmManager(
+        p -> assertChangesNothing(() -> p.provisionManagedUsers(List.of(user("system-alice")))));
   }
 
   @Test
   void sendsNoWritesWhenAUserDeclaringNoEnabledFlagIsRerun() {
-    UserRepresentation undeclared = user("alice");
+    UserRepresentation undeclared = user("system-alice");
     undeclared.setEnabled(null);
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(undeclared)));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(undeclared)));
 
-    withFixedUserListProvisioner(
-        p -> assertChangesNothing(() -> p.provisionFixedUserList(List.of(undeclared))));
+    withRealmManager(p -> assertChangesNothing(() -> p.provisionManagedUsers(List.of(undeclared))));
   }
 
   @Test
   void sendsOnlyThePasswordResetWhenRerunWithAPassword() {
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(userWithPassword("system-alice"))));
 
-    withFixedUserListProvisioner(
+    withRealmManager(
         p ->
             assertThat(
                     assertSendsOnlyWrites(
-                            () -> p.provisionFixedUserList(List.of(userWithPassword("alice"))),
+                            () ->
+                                p.provisionManagedUsers(List.of(userWithPassword("system-alice"))),
                             "PUT /admin/realms/test/users/<id>/reset-password")
                         .changes())
                 .extracting(Change::target, Change::name, Change::type)
-                .containsExactly(tuple(Target.PASSWORD, "alice", Type.UPDATED)));
+                .containsExactly(tuple(Target.PASSWORD, "system-alice", Type.UPDATED)));
   }
 
   @Test
   void setsAPasswordThatCanBeUsedToLogIn() {
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(userWithPassword("system-alice"))));
 
-    assertThat(logIn("alice", PASSWORD)).isNotBlank();
+    assertThat(logIn("system-alice", PASSWORD)).isNotBlank();
   }
 
   @Test
   void setsANewUsersPasswordOnlyThroughItsCreation() {
-    withFixedUserListProvisioner(
+    withRealmManager(
         p ->
             assertSendsOnlyWrites(
-                () -> p.provisionFixedUserList(List.of(userWithPassword("alice"))),
+                () -> p.provisionManagedUsers(List.of(userWithPassword("system-alice"))),
                 "POST /admin/realms/test/users"));
   }
 
   @Test
   void restoresAPasswordChangedOutOfBand() {
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(userWithPassword("system-alice"))));
     adminClient()
         .realm(REALM)
         .users()
-        .get(findUser("alice").getId())
+        .get(findUser("system-alice").getId())
         .resetPassword(password("Ch4nged-P4ssw0rd!"));
 
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(userWithPassword("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(userWithPassword("system-alice"))));
 
-    assertThat(logIn("alice", PASSWORD)).isNotBlank();
+    assertThat(logIn("system-alice", PASSWORD)).isNotBlank();
   }
 
   /** Both reject a password reset to the current value, so a rerun could never re-apply it. */
@@ -157,42 +191,40 @@ class FixedUserListProvisioningTest extends SharedKeycloakTest {
 
     assertThatThrownBy(
             () ->
-                withFixedUserListProvisioner(
-                    p -> p.provisionFixedUserList(List.of(userWithPassword("alice")))))
+                withRealmManager(
+                    p -> p.provisionManagedUsers(List.of(userWithPassword("system-alice")))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining(policy.substring(0, policy.indexOf('(')));
-    assertThat(usernames()).doesNotContain("alice");
+    assertThat(usernames()).doesNotContain("system-alice");
 
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("bob"))));
-    assertThat(usernames()).contains("bob");
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-bob"))));
+    assertThat(usernames()).contains("system-bob");
   }
 
   /** Keycloak's reset-password endpoint ignores the type and stores any value as the password. */
   @Test
   void rejectsCredentialsOtherThanPasswords() {
-    UserRepresentation withOtp = user("alice");
+    UserRepresentation withOtp = user("system-alice");
     CredentialRepresentation otp = new CredentialRepresentation();
     otp.setType(CredentialRepresentation.TOTP);
     otp.setValue("123456");
     withOtp.setCredentials(List.of(otp));
 
-    assertThatThrownBy(
-            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withOtp))))
+    assertThatThrownBy(() -> withRealmManager(p -> p.provisionManagedUsers(List.of(withOtp))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("otp");
-    assertThat(usernames()).doesNotContain("alice");
+    assertThat(usernames()).doesNotContain("system-alice");
   }
 
   @Test
   void rejectsAMixedCaseUsername() {
     assertThatThrownBy(
-            () ->
-                withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("Alice")))))
+            () -> withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-Alice")))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("lower-case")
-        .hasMessageContaining("Alice");
+        .hasMessageContaining("system-Alice");
 
-    assertThat(usernames()).doesNotContain("alice", "Alice");
+    assertThat(usernames()).doesNotContain("system-alice");
   }
 
   /** Keycloak leaves service accounts out of the user listing, which is what protects them. */
@@ -206,7 +238,7 @@ class FixedUserListProvisioningTest extends SharedKeycloakTest {
     withRealmManager(rm -> rm.provisionManagedClients(List.of(serviceAccountClient)));
     String serviceAccountId = serviceAccountUserId();
 
-    withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(user("alice"))));
+    withRealmManager(p -> p.provisionManagedUsers(List.of(user("system-alice"))));
 
     assertThat(serviceAccountUserId()).isEqualTo(serviceAccountId);
   }
@@ -222,45 +254,37 @@ class FixedUserListProvisioningTest extends SharedKeycloakTest {
     return adminClient().realm(REALM).clients().get(id).getServiceAccountUser().getId();
   }
 
-  /** Keycloak ignores these on creation and this provisioner applies none of them. */
   @Test
   void rejectsAUserDeclaringRolesOrGroups() {
-    UserRepresentation withRoles = user("alice");
+    UserRepresentation withRoles = user("system-alice");
     withRoles.setRealmRoles(List.of("some-role"));
 
-    assertThatThrownBy(
-            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withRoles))))
+    assertThatThrownBy(() -> withRealmManager(p -> p.provisionManagedUsers(List.of(withRoles))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("realmRoles");
 
-    UserRepresentation withGroups = user("bob");
+    UserRepresentation withGroups = user("system-bob");
     withGroups.setGroups(List.of("some-group"));
 
-    assertThatThrownBy(
-            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(withGroups))))
+    assertThatThrownBy(() -> withRealmManager(p -> p.provisionManagedUsers(List.of(withGroups))))
         .isInstanceOf(KeycloakException.class)
         .hasMessageContaining("groups");
 
-    assertThat(usernames()).doesNotContain("alice", "bob");
-  }
-
-  private void withFixedUserListProvisioner(Consumer<FixedUserListProvisioner> action) {
-    withRealmManager(realmManager -> action.accept(new FixedUserListProvisioner(realmManager)));
+    assertThat(usernames()).doesNotContain("system-alice", "system-bob");
   }
 
   /** Keycloak lower-cases a stored email, so a mixed-case one is never what the realm holds. */
   @Test
   void rejectsAnEmailThatIsNotLowerCase() {
-    UserRepresentation mixedCase = user("alice");
+    UserRepresentation mixedCase = user("system-alice");
     mixedCase.setEmail("Alice@Example.com");
 
-    assertThatThrownBy(
-            () -> withFixedUserListProvisioner(p -> p.provisionFixedUserList(List.of(mixedCase))))
+    assertThatThrownBy(() -> withRealmManager(p -> p.provisionManagedUsers(List.of(mixedCase))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("email")
         .hasMessageContaining("Alice@Example.com");
 
-    assertThat(usernames()).doesNotContain("alice");
+    assertThat(usernames()).doesNotContain("system-alice");
   }
 
   private static UserRepresentation user(String username) {
