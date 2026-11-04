@@ -58,6 +58,7 @@ Maven:
   - [Keycloak's own clients](#-keycloaks-own-clients)
   - [Client hardening](#️-client-hardening)
   - [Client scopes](#-client-scopes)
+  - [Groups](#-groups)
   - [Naming](#️-naming)
 - [Test fixtures](#-test-fixtures)
 - [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
@@ -376,6 +377,7 @@ connection is opened.
 | `provisionRequiredActions` | unregisters every required action not in the list — an empty list means "not declared" here, so Keycloak's own are left alone |
 | `provisionBuiltInClients` | resets every client Keycloak provides that is not in the list to its hardened default, which for `broker` and `admin-cli` means disabled |
 | `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list                                                          |
+| `provisionManagedGroups` | deletes every group whose name carries the prefix and is not in the list, at every level of the tree                               |
 | `FixedUserListProvisioner.provisionFixedUserList` | deletes **every user in the realm** that is not in the list — see [below](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner) |
 
 ### 🔐 Authentication flows
@@ -511,6 +513,43 @@ with no default scopes either, and its tokens carry neither `preferred_username`
 while login still succeeds, which makes the omission easy to miss. `provisionManagedClients` rejects
 a half-declared client rather than letting that happen.
 
+### 👪 Groups
+
+Groups are declared as a tree with `GroupConfig`. Every group carries the prefix, sub-groups
+included, so the fence works the same at each level: a group without it is never touched, and
+neither is anything below it.
+
+```java
+ManagedNaming naming = ManagedNaming.standard();
+
+realmManager.provisionManagedGroups(
+    List.of(
+        GroupConfig.builder(naming.groupName("Staff").value())
+            .realmRoles("reader")
+            .clientRoles("system-api", "use")
+            .attribute("cost-center", "4711")
+            .subGroups(
+                GroupConfig.builder(naming.groupName("Editors").value())
+                    .realmRoles("writer")
+                    .build())
+            .build()));
+
+realmManager.findGroupByPath("/[System] Staff/[System] Editors")
+    .ifPresent(group -> userResource.joinGroup(group.getId()));
+```
+
+A group's declared realm and client roles are its full set of direct role mappings. The roles, and
+the clients they belong to, have to exist before the groups that reference them.
+
+> [!WARNING]
+> Groups are matched by name. Renaming one, or moving it to another parent, deletes it and creates
+> a new one — its members lose the membership. Deleting a managed group also deletes every group
+> below it, including unprefixed ones created by hand.
+
+If you keep your groups as an enum, map it to `GroupConfig` in your own code; the enum stays the
+handle you use for memberships. Anything `GroupConfig` does not model is yours to change through
+`findGroupByPath` and `getRealmResource()` after provisioning.
+
 ### 🏷️ Naming
 
 `provisionManagedClients` only ever deletes clients carrying the configured prefix, which is what
@@ -521,7 +560,7 @@ keeps it away from anything you did not provision.
 > provisioned under the old prefix and pulls unrelated objects into scope for deletion.
 
 > [!WARNING]
-> The prefix fences clients and client scopes — **not flows or users**. `provisionFlows` is bounded
+> The prefix fences clients, client scopes and groups — **not flows or users**. `provisionFlows` is bounded
 > by Keycloak's own built-in flag, so every flow it did not create is in scope, including ones made
 > by hand in the admin console. `provisionFixedUserList` has no fence at all.
 
@@ -584,6 +623,9 @@ validation files so they stay stable across environments. Add your own normalize
 
 `validateFlows` covers every flow in the realm, including Keycloak's own, which makes for a large
 file before you add any of your own — `validateCustomFlows` asserts only the flows you provisioned.
+
+`validateGroups` writes the whole group tree, each group with its realm and client role mappings,
+and a second file with the members of every group, keyed by its path.
 
 Properties are serialized in alphabetical order; override `jsonMapper()` if you are migrating files
 written with a different ordering.

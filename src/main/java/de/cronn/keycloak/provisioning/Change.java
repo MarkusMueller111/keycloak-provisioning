@@ -4,7 +4,8 @@ package de.cronn.keycloak.provisioning;
  * One write a provisioning run sent to Keycloak.
  *
  * @param name the changed object's identifier: client id, scope or flow alias, username, ...
- * @param parent the client, client scope or flow the object belongs to, or {@code null}
+ * @param parent the client, client scope or flow the object belongs to, or the path of its parent
+ *     group; {@code null} for a top-level object
  * @param diff the masked JSON diff of an {@link Type#UPDATED} object, otherwise {@code null}
  */
 public record Change(Target target, String name, String parent, Type type, String diff) {
@@ -28,6 +29,11 @@ public record Change(Target target, String name, String parent, Type type, Strin
     REQUIRED_ACTION("required action"),
     USER_PROFILE("user profile"),
     DEFAULT_ROLE_COMPOSITE("default role composite"),
+    GROUP("group"),
+    GROUP_REALM_ROLE("group realm role mapping"),
+    /** Named {@code <clientId>:<role>}. */
+    GROUP_CLIENT_ROLE("group client role mapping"),
+    GROUP_MEMBER("group member"),
     USER("user"),
     PASSWORD("password"),
     PERMANENT_ADMIN("permanent admin");

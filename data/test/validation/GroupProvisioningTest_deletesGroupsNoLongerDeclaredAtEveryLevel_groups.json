@@ -1,0 +1,37 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : { },
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "[System] Staff",
+  "parentId" : null,
+  "path" : "/[System] Staff",
+  "realmRoles" : null,
+  "subGroupCount" : 1,
+  "subGroups" : [ {
+    "access" : {
+      "view" : true,
+      "viewMembers" : true,
+      "manageMembers" : true,
+      "manage" : true,
+      "manageMembership" : true
+    },
+    "attributes" : { },
+    "clientRoles" : null,
+    "description" : null,
+    "id" : "[id]",
+    "name" : "[System] Editors",
+    "parentId" : null,
+    "path" : "/[System] Staff/[System] Editors",
+    "realmRoles" : [ "writer" ],
+    "subGroupCount" : 0,
+    "subGroups" : [ ]
+  } ]
+} ]

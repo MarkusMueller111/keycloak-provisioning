@@ -1,10 +1,15 @@
 package de.cronn.keycloak.provisioning;
 
+import de.cronn.assertions.validationfile.ValidationFileAssertions.FailedAssertionHandler;
 import de.cronn.keycloak.provisioning.connection.DefaultKeycloakConnectionManager;
 import de.cronn.keycloak.provisioning.connection.admincli.KeycloakAdminCliConnectionManager;
 import java.util.function.Consumer;
+import org.assertj.core.api.SoftAssertions;
+import org.assertj.core.api.junit.jupiter.InjectSoftAssertions;
+import org.assertj.core.api.junit.jupiter.SoftAssertionsExtension;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.keycloak.admin.client.Keycloak;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.testcontainers.containers.GenericContainer;
@@ -14,7 +19,11 @@ import org.testcontainers.containers.GenericContainer;
  * They share one container for the whole suite, so they must not change the master realm beyond
  * bootstrapping the provisioning client.
  */
+@ExtendWith(SoftAssertionsExtension.class)
 abstract class SharedKeycloakTest extends KeycloakContainerSupport {
+
+  /** Reports every mismatching validation file of a test, not just the first. */
+  @InjectSoftAssertions private SoftAssertions softly;
 
   private static final GenericContainer<?> KEYCLOAK = startKeycloak();
 
@@ -26,6 +35,11 @@ abstract class SharedKeycloakTest extends KeycloakContainerSupport {
       adminConnection(KEYCLOAK);
 
   protected static final String REALM = "test";
+
+  @Override
+  public FailedAssertionHandler failedAssertionHandler() {
+    return callable -> softly.check(callable::call);
+  }
 
   @Override
   protected GenericContainer<?> keycloak() {

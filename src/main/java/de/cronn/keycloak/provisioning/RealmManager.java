@@ -9,10 +9,12 @@ import de.cronn.keycloak.provisioning.differ.AuthenticationFlowRepresentationDif
 import de.cronn.keycloak.provisioning.differ.ClientRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ClientScopeRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.Differ;
+import de.cronn.keycloak.provisioning.differ.GroupRepresentationDiffer;
 import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
+import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -47,8 +51,11 @@ import org.keycloak.admin.client.resource.UserResource;
 import org.keycloak.admin.client.resource.UsersResource;
 import org.keycloak.representations.idm.AuthenticationExecutionInfoRepresentation;
 import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
+import org.keycloak.representations.idm.ClientMappingsRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
+import org.keycloak.representations.idm.GroupRepresentation;
+import org.keycloak.representations.idm.MappingsRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -485,6 +492,287 @@ public class RealmManager {
               + "' cannot be provisioned: its name must carry the configured prefix '"
               + clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT_SCOPE)
               + "'.");
+    }
+  }
+
+  /**
+   * Provisions the groups carrying the configured prefix, at every level of the tree. A group
+   * without the prefix is never touched, nor is anything below it; one created by hand under a
+   * managed group survives, unless that group is deleted, which takes its whole subtree with it.
+   * Groups are matched by name, so a renamed or moved group is deleted and created anew, and its
+   * members lose the membership.
+   *
+   * <p>The declared realm and client roles are a group's full set of direct role mappings.
+   */
+  public ProvisioningResult provisionManagedGroups(List<GroupConfig> groups) {
+    assertGroupsAreProvisionable(groups, null);
+    DeclaredGroupRoles declaredRoles = resolveDeclaredRoles(groups, null, new DeclaredGroupRoles());
+    Changes changes = changes();
+
+    GroupsResource groupsResource = getGroupsResource();
+    provisionGroups(
+        managedOnly(groupsResource.groups(null, null, 0, Integer.MAX_VALUE, false)),
+        groups,
+        null,
+        groupsResource::add,
+        declaredRoles,
+        changes);
+    return changes.result();
+  }
+
+  private List<GroupRepresentation> managedOnly(List<GroupRepresentation> groups) {
+    return groups.stream().filter(clientNaming::isManaged).toList();
+  }
+
+  private void provisionGroups(
+      List<GroupRepresentation> existingGroups,
+      List<GroupConfig> groups,
+      String parentPath,
+      Function<GroupRepresentation, Response> create,
+      DeclaredGroupRoles declaredRoles,
+      Changes changes) {
+    GroupRepresentationDiffer differ =
+        new GroupRepresentationDiffer(
+            existingGroups, groups.stream().map(RealmManager::toRepresentation).toList());
+
+    Map<String, String> idsByName = new LinkedHashMap<>();
+    existingGroups.forEach(group -> idsByName.put(group.getName(), group.getId()));
+    for (GroupRepresentation group : differ.getElementsToAdd()) {
+      changes.added(Target.GROUP, group.getName(), parentPath);
+      try (Response response = create.apply(group)) {
+        assertResponseIs201Created(response);
+        idsByName.put(group.getName(), CreatedResponseUtil.getCreatedId(response));
+      }
+    }
+    for (GroupRepresentation group : differ.getElementsToDelete()) {
+      changes.removed(Target.GROUP, group.getName(), parentPath);
+      getGroupResource(group.getId()).remove();
+    }
+    for (ToUpdate<GroupRepresentation> update : differ.getElementsToUpdate()) {
+      GroupRepresentation group = update.newState();
+      changes.updated(Target.GROUP, group.getName(), parentPath, update.multiLineDiff());
+      getGroupResource(group.getId()).update(group);
+    }
+
+    Set<String> created =
+        differ.getElementsToAdd().stream()
+            .map(GroupRepresentation::getName)
+            .collect(Collectors.toSet());
+    for (GroupConfig group : groups) {
+      boolean isNew = created.contains(group.name());
+      GroupResource groupResource = getGroupResource(idsByName.get(group.name()));
+      String path = groupPath(parentPath, group.name());
+      provisionGroupRoles(groupResource, isNew, group, path, declaredRoles, changes);
+      provisionGroups(
+          isNew ? List.of() : managedOnly(groupResource.getSubGroups(0, Integer.MAX_VALUE, false)),
+          group.subGroups(),
+          path,
+          groupResource::subGroup,
+          declaredRoles,
+          changes);
+    }
+  }
+
+  private static void provisionGroupRoles(
+      GroupResource groupResource,
+      boolean isNew,
+      GroupConfig group,
+      String path,
+      DeclaredGroupRoles declaredRoles,
+      Changes changes) {
+    MappingsRepresentation mapped =
+        isNew ? new MappingsRepresentation() : groupResource.roles().getAll();
+    provisionRoleMappings(
+        mapped.getRealmMappings(),
+        group.realmRoles(),
+        declaredRoles.realmRoles()::get,
+        groupResource.roles().realmLevel(),
+        Target.GROUP_REALM_ROLE,
+        UnaryOperator.identity(),
+        path,
+        changes);
+
+    Map<String, ClientMappingsRepresentation> mappedByClientId =
+        mapped.getClientMappings() == null ? Map.of() : mapped.getClientMappings();
+    Set<String> clientIds = new LinkedHashSet<>(mappedByClientId.keySet());
+    clientIds.addAll(group.clientRoles().keySet());
+    for (String clientId : clientIds) {
+      ClientMappingsRepresentation mappedForClient = mappedByClientId.get(clientId);
+      String clientUuid =
+          mappedForClient != null
+              ? mappedForClient.getId()
+              : declaredRoles.clientUuids().get(clientId);
+      provisionRoleMappings(
+          mappedForClient == null ? null : mappedForClient.getMappings(),
+          group.clientRoles().getOrDefault(clientId, List.of()),
+          roleName -> declaredRoles.clientRoles().get(clientId).get(roleName),
+          groupResource.roles().clientLevel(clientUuid),
+          Target.GROUP_CLIENT_ROLE,
+          roleName -> clientId + ":" + roleName,
+          path,
+          changes);
+    }
+  }
+
+  private static void provisionRoleMappings(
+      List<RoleRepresentation> mapped,
+      List<String> declared,
+      Function<String, RoleRepresentation> resolveDeclared,
+      RoleScopeResource scope,
+      Target target,
+      UnaryOperator<String> changeName,
+      String path,
+      Changes changes) {
+    List<RoleRepresentation> mappedOrEmpty = mapped == null ? List.of() : mapped;
+    AbstractDiffer<String> differ =
+        new AbstractDiffer<>(
+            mappedOrEmpty.stream().map(RoleRepresentation::getName).toList(), declared);
+
+    List<RoleRepresentation> toRemove =
+        mappedOrEmpty.stream()
+            .filter(role -> differ.getElementsToDelete().contains(role.getName()))
+            .toList();
+    if (!toRemove.isEmpty()) {
+      toRemove.forEach(role -> changes.removed(target, changeName.apply(role.getName()), path));
+      scope.remove(toRemove);
+    }
+    List<RoleRepresentation> toAdd =
+        differ.getElementsToAdd().stream().map(resolveDeclared).toList();
+    if (!toAdd.isEmpty()) {
+      toAdd.forEach(role -> changes.added(target, changeName.apply(role.getName()), path));
+      scope.add(toAdd);
+    }
+  }
+
+  private static GroupRepresentation toRepresentation(GroupConfig config) {
+    GroupRepresentation group = new GroupRepresentation();
+    group.setName(config.name());
+    group.setDescription(config.description());
+    group.setAttributes(config.attributes());
+    return group;
+  }
+
+  private static String groupPath(String parentPath, String name) {
+    return (parentPath == null ? "" : parentPath) + "/" + name;
+  }
+
+  /**
+   * Without the prefix a group would be created but never recognized as existing again, so the next
+   * run would fail with a conflict.
+   */
+  private void assertGroupsAreProvisionable(List<GroupConfig> groups, String parentPath) {
+    Set<String> seen = new LinkedHashSet<>();
+    for (GroupConfig group : groups) {
+      String path = groupPath(parentPath, group.name());
+      if (!clientNaming.isManaged(ManagedNaming.ManagedEntity.GROUP, group.name())) {
+        throw new KeycloakException(
+            "Group '"
+                + path
+                + "' cannot be provisioned: its name must carry the configured prefix '"
+                + clientNaming.prefix(ManagedNaming.ManagedEntity.GROUP)
+                + "'. Use ManagedNaming.groupName(...) to build it.");
+      }
+      Validate.isTrue(seen.add(group.name()), "Group '%s' is declared more than once", path);
+      assertGroupsAreProvisionable(group.subGroups(), path);
+    }
+  }
+
+  private DeclaredGroupRoles resolveDeclaredRoles(
+      List<GroupConfig> groups, String parentPath, DeclaredGroupRoles resolved) {
+    for (GroupConfig group : groups) {
+      String path = groupPath(parentPath, group.name());
+      for (String roleName : group.realmRoles()) {
+        resolved
+            .realmRoles()
+            .computeIfAbsent(
+                roleName,
+                name ->
+                    findRole(getRealmResource().roles(), name)
+                        .orElseThrow(
+                            () ->
+                                new KeycloakException(
+                                    "Group '"
+                                        + path
+                                        + "' declares realm role '"
+                                        + name
+                                        + "', which does not exist")));
+      }
+      group
+          .clientRoles()
+          .forEach(
+              (clientId, roleNames) -> resolveClientRoles(clientId, roleNames, path, resolved));
+      resolveDeclaredRoles(group.subGroups(), path, resolved);
+    }
+    return resolved;
+  }
+
+  private void resolveClientRoles(
+      String clientId, List<String> roleNames, String path, DeclaredGroupRoles resolved) {
+    String clientUuid =
+        resolved
+            .clientUuids()
+            .computeIfAbsent(
+                clientId,
+                id ->
+                    getRealmResource().clients().findByClientId(id).stream()
+                        .findFirst()
+                        .map(ClientRepresentation::getId)
+                        .orElseThrow(
+                            () ->
+                                new KeycloakException(
+                                    "Group '"
+                                        + path
+                                        + "' declares roles of client '"
+                                        + id
+                                        + "', which does not exist")));
+    Map<String, RoleRepresentation> rolesOfClient =
+        resolved.clientRoles().computeIfAbsent(clientId, id -> new LinkedHashMap<>());
+    for (String roleName : roleNames) {
+      rolesOfClient.computeIfAbsent(
+          roleName,
+          name ->
+              findRole(getRealmResource().clients().get(clientUuid).roles(), name)
+                  .orElseThrow(
+                      () ->
+                          new KeycloakException(
+                              "Group '"
+                                  + path
+                                  + "' declares role '"
+                                  + name
+                                  + "' of client '"
+                                  + clientId
+                                  + "', which does not exist")));
+    }
+  }
+
+  private static Optional<RoleRepresentation> findRole(RolesResource roles, String name) {
+    try {
+      return Optional.of(roles.get(name).toRepresentation());
+    } catch (NotFoundException e) {
+      return Optional.empty();
+    }
+  }
+
+  /** Resolved before the first write, so a typo cannot leave the tree half provisioned. */
+  private record DeclaredGroupRoles(
+      Map<String, RoleRepresentation> realmRoles,
+      Map<String, String> clientUuids,
+      Map<String, Map<String, RoleRepresentation>> clientRoles) {
+
+    DeclaredGroupRoles() {
+      this(new LinkedHashMap<>(), new LinkedHashMap<>(), new LinkedHashMap<>());
+    }
+  }
+
+  /**
+   * The path is the group names joined by {@code /} with a leading one, e.g. {@code "/[System]
+   * Staff/Editors"}.
+   */
+  public Optional<GroupRepresentation> findGroupByPath(String path) {
+    try {
+      return Optional.of(getRealmResource().getGroupByPath(path));
+    } catch (NotFoundException e) {
+      return Optional.empty();
     }
   }
 

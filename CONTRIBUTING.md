@@ -84,7 +84,10 @@ differently depending on where it is sent:
 - A client's *scope assignments* are ignored on its update as well, and need their own endpoints.
 - `searchByUsername(name, true)` is case-insensitive, but Keycloak stores usernames lower-cased.
 - An authentication execution's update honours only `requirement` and `priority`.
-- An update ignores every `null` field. A string is cleared only by sending `""`.
+- An update ignores every `null` field. A string is cleared only by sending `""`. A group's
+  update is the exception: a `null` description clears it, and its attributes are replaced as a
+  whole.
+- A group's `realmRoles` are ignored on create, and a group listing never fills `subGroups`.
 - A client's attributes and flow-binding overrides are merged on update: a key left out keeps its
   value, and one sent as `""` is removed. A client scope's attributes cannot be removed at all —
   `""` is stored as `""`. A realm attribute left out of the update is removed.
