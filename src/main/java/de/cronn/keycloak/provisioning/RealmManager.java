@@ -17,6 +17,7 @@ import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -255,7 +256,8 @@ public class RealmManager {
     clients.forEach(RealmManager::assertClientScopesAreCompletelySpecified);
     clients.forEach(RealmManager::assertRedirectUrisAreNotWildcards);
     Predicate<ClientRepresentation> existingClientsPredicate = clientNaming::isManaged;
-    return provisionManagedClients(withSecurityFlagDefaults(clients), existingClientsPredicate);
+    return provisionManagedClients(
+        withSecurityFlagDefaults(clients), existingClientsPredicate, new HashMap<>());
   }
 
   /**
@@ -327,16 +329,32 @@ public class RealmManager {
    */
   public ProvisioningResult createOrUpdateUnmanagedClient(ClientRepresentation client) {
     String clientId = client.getClientId();
+    return provisionUnmanagedClient(
+        client, existing -> clientId.equals(existing.getClientId()), new HashMap<>());
+  }
+
+  /** Returns the new client's id. Fails with a conflict if the client exists. */
+  String createUnmanagedClient(ClientRepresentation client) {
+    Map<String, String> createdIdsByClientId = new HashMap<>();
+    provisionUnmanagedClient(client, existing -> false, createdIdsByClientId);
+    return createdIdsByClientId.get(client.getClientId());
+  }
+
+  private ProvisioningResult provisionUnmanagedClient(
+      ClientRepresentation client,
+      Predicate<ClientRepresentation> existingClientsToConsiderPredicate,
+      Map<String, String> createdIdsByClientId) {
     Validate.isTrue(
         !clientNaming.isManaged(client),
         "Client '%s' carries the managed prefix '%s' and belongs in provisionManagedClients",
-        clientId,
+        client.getClientId(),
         clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT));
     assertClientScopesAreCompletelySpecified(client);
     assertRedirectUrisAreNotWildcards(client);
     return provisionManagedClients(
         List.of(withSecurityFlagDefaults(client)),
-        existing -> clientId.equals(existing.getClientId()));
+        existingClientsToConsiderPredicate,
+        createdIdsByClientId);
   }
 
   /**
@@ -410,7 +428,8 @@ public class RealmManager {
 
   private ProvisioningResult provisionManagedClients(
       List<ClientRepresentation> clients,
-      Predicate<ClientRepresentation> existingClientsToConsiderPredicate) {
+      Predicate<ClientRepresentation> existingClientsToConsiderPredicate,
+      Map<String, String> createdIdsByClientId) {
     Changes changes = changes();
     // Read once if anything needs it: client writes never add or remove a client scope themselves.
     Map<String, String> scopeIdsByName =
@@ -425,7 +444,10 @@ public class RealmManager {
             .toList();
 
     ClientRepresentationDiffer clientDiffer = getClientsDiffer(existingClients, clients);
-    clientDiffer.getElementsToAdd().forEach(client -> addClient(client, changes));
+    clientDiffer
+        .getElementsToAdd()
+        .forEach(
+            client -> createdIdsByClientId.put(client.getClientId(), addClient(client, changes)));
     clientDiffer.getElementsToDelete().forEach(client -> deleteClient(client, changes));
     clientDiffer.getElementsToUpdate().forEach(update -> updateClient(update, changes));
 
@@ -694,10 +716,11 @@ public class RealmManager {
     return scopeId;
   }
 
-  private void addClient(ClientRepresentation clientRepresentation, Changes changes) {
+  private String addClient(ClientRepresentation clientRepresentation, Changes changes) {
     changes.added(Target.CLIENT, clientRepresentation.getClientId());
     try (Response response = getRealmResource().clients().create(clientRepresentation)) {
       assertResponseIs201Created(response);
+      return CreatedResponseUtil.getCreatedId(response);
     }
   }
 

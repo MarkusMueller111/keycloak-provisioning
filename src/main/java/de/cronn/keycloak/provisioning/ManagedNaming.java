@@ -124,6 +124,10 @@ public final class ManagedNaming {
     return name.startsWith(prefix(entity));
   }
 
+  boolean isProvisioningClient(String clientId) {
+    return clientId.equals(provisioningClientId);
+  }
+
   public String prefix(ManagedEntity entity) {
     return switch (entity) {
       case CLIENT -> clientPrefix;

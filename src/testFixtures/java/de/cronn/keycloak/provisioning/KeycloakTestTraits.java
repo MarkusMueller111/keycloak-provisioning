@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import de.cronn.assertions.validationfile.junit5.JUnit5ValidationFileAssertions;
 import de.cronn.assertions.validationfile.normalization.ValidationNormalizer;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -344,6 +345,28 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
             .toList();
 
     assertWithJsonFileWithSuffix(clients, keycloakValidationNormalizer(), "clients");
+  }
+
+  /**
+   * Leaves out the clients Keycloak creates itself, including the {@code <realm>-realm} clients of
+   * the master realm.
+   */
+  default void validateCustomClients(RealmManager realmManager) {
+    List<ClientRepresentation> clients =
+        realmManager.getRealmResource().clients().findAll().stream()
+            .filter(client -> !isKeycloakProvided(client))
+            .peek(KeycloakTestTraits::normalizeClient)
+            .sorted(Comparator.comparing(ClientRepresentation::getClientId))
+            .toList();
+
+    assertWithJsonFileWithSuffix(clients, keycloakValidationNormalizer(), "clients");
+  }
+
+  private static boolean isKeycloakProvided(ClientRepresentation client) {
+    return Arrays.stream(KeycloakProvidedClient.values())
+            .anyMatch(builtIn -> builtIn.getClientId().equals(client.getClientId()))
+        || (client.getAttributes() != null
+            && "true".equals(client.getAttributes().get("realm_client")));
   }
 
   default void validateServiceAccountUsers(RealmManager realmManager) {
