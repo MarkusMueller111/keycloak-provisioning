@@ -62,6 +62,7 @@ Maven:
   - [Naming](#️-naming)
 - [On-demand changes](#-on-demand-changes)
   - [On-demand groups](#-on-demand-groups)
+  - [On-demand users](#-on-demand-users)
 - [Test fixtures](#-test-fixtures)
 - [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
 - [Requirements](#-requirements)
@@ -630,6 +631,20 @@ which may change.
 Managed and unmanaged groups are never nested in each other: `createSubGroup` refuses a parent that
 is managed or lies within a managed group, where the new group would be deleted along with it.
 Memberships are references, not part of the tree, so users can join managed groups as well.
+
+### 👤 On-demand users
+
+```java
+UserAdministration users = new UserAdministration(realmManager);
+
+String userId = users.createUser(user);
+users.resetPassword(userId, initialPassword, true);
+```
+
+`updateUser` takes the user's full desired state, like provisioning does: a field left `null` gets
+the value of a newly created user, so an undeclared `enabled` disables the account. Memberships go
+through `GroupAdministration`; a user declaring `groups` or roles is refused, since Keycloak would
+ignore them. A client's service account cannot be changed or deleted on its own.
 
 ## ✅ Test fixtures
 

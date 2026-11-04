@@ -46,8 +46,8 @@ public final class FixedUserListProvisioner {
   public ProvisioningResult provisionFixedUserList(List<UserRepresentation> users) {
     users.forEach(user -> UserFields.requireLowerCaseUsername(user.getUsername()));
     users.forEach(user -> UserFields.requireLowerCaseEmail(user.getEmail()));
-    users.forEach(FixedUserListProvisioner::assertNoMembershipsAreDeclared);
-    users.forEach(FixedUserListProvisioner::assertOnlyPasswordsAreDeclared);
+    users.forEach(UserFields::requireNoMembershipsDeclared);
+    users.forEach(UserFields::requireOnlyPasswordsDeclared);
     if (users.stream().anyMatch(FixedUserListProvisioner::declaresCredentials)) {
       assertPasswordsCanBeSetAgain();
     }
@@ -79,23 +79,6 @@ public final class FixedUserListProvisioner {
     return user.getCredentials() != null && !user.getCredentials().isEmpty();
   }
 
-  /** Keycloak's reset-password endpoint ignores the type and stores any value as the password. */
-  private static void assertOnlyPasswordsAreDeclared(UserRepresentation user) {
-    if (user.getCredentials() == null) {
-      return;
-    }
-    for (CredentialRepresentation credential : user.getCredentials()) {
-      if (!CredentialRepresentation.PASSWORD.equals(credential.getType())) {
-        throw new KeycloakException(
-            "User '"
-                + user.getUsername()
-                + "' declares a credential of type '"
-                + credential.getType()
-                + "'. Only passwords can be provisioned.");
-      }
-    }
-  }
-
   /** Both reject a reset to the current password, so the next run could never set it again. */
   private void assertPasswordsCanBeSetAgain() {
     String passwordPolicy = realmManager.getRealmResource().toRepresentation().getPasswordPolicy();
@@ -112,27 +95,6 @@ public final class FixedUserListProvisioner {
                 + "', which forbids setting a password again. Remove it, or declare no passwords:"
                 + " provisioning sets every declared password again on each run.");
       }
-    }
-  }
-
-  /**
-   * Keycloak ignores all three on creation and this class provisions none of them, so a declaration
-   * would look applied while nothing was granted.
-   */
-  private static void assertNoMembershipsAreDeclared(UserRepresentation user) {
-    assertNotDeclared(user.getUsername(), "realmRoles", user.getRealmRoles());
-    assertNotDeclared(user.getUsername(), "clientRoles", user.getClientRoles());
-    assertNotDeclared(user.getUsername(), "groups", user.getGroups());
-  }
-
-  private static void assertNotDeclared(String username, String what, Object value) {
-    if (value != null) {
-      throw new KeycloakException(
-          "User '"
-              + username
-              + "' declares "
-              + what
-              + ", which this provisioner does not apply. Grant them through RealmManager instead.");
     }
   }
 
