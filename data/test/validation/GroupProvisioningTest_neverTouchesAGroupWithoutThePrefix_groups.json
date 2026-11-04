@@ -1,0 +1,37 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : { },
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "Customers",
+  "parentId" : null,
+  "path" : "/Customers",
+  "realmRoles" : null,
+  "subGroupCount" : 1,
+  "subGroups" : [ {
+    "access" : {
+      "view" : true,
+      "viewMembers" : true,
+      "manageMembers" : true,
+      "manage" : true,
+      "manageMembership" : true
+    },
+    "attributes" : { },
+    "clientRoles" : null,
+    "description" : null,
+    "id" : "[id]",
+    "name" : "[System] Premium",
+    "parentId" : null,
+    "path" : "/Customers/[System] Premium",
+    "realmRoles" : null,
+    "subGroupCount" : 0,
+    "subGroups" : [ ]
+  } ]
+} ]

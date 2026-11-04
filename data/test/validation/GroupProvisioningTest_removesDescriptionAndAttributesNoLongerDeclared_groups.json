@@ -1,0 +1,77 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : { },
+  "clientRoles" : {
+    "system-api" : [ "use" ]
+  },
+  "description" : null,
+  "id" : "[id]",
+  "name" : "[System] Staff",
+  "parentId" : null,
+  "path" : "/[System] Staff",
+  "realmRoles" : [ "reader" ],
+  "subGroupCount" : 2,
+  "subGroups" : [ {
+    "access" : {
+      "view" : true,
+      "viewMembers" : true,
+      "manageMembers" : true,
+      "manage" : true,
+      "manageMembership" : true
+    },
+    "attributes" : { },
+    "clientRoles" : null,
+    "description" : null,
+    "id" : "[id]",
+    "name" : "[System] Auditors",
+    "parentId" : null,
+    "path" : "/[System] Staff/[System] Auditors",
+    "realmRoles" : [ "auditor" ],
+    "subGroupCount" : 0,
+    "subGroups" : [ ]
+  }, {
+    "access" : {
+      "view" : true,
+      "viewMembers" : true,
+      "manageMembers" : true,
+      "manage" : true,
+      "manageMembership" : true
+    },
+    "attributes" : { },
+    "clientRoles" : null,
+    "description" : null,
+    "id" : "[id]",
+    "name" : "[System] Editors",
+    "parentId" : null,
+    "path" : "/[System] Staff/[System] Editors",
+    "realmRoles" : [ "writer" ],
+    "subGroupCount" : 1,
+    "subGroups" : [ {
+      "access" : {
+        "view" : true,
+        "viewMembers" : true,
+        "manageMembers" : true,
+        "manage" : true,
+        "manageMembership" : true
+      },
+      "attributes" : { },
+      "clientRoles" : {
+        "system-api" : [ "admin" ]
+      },
+      "description" : null,
+      "id" : "[id]",
+      "name" : "[System] Senior",
+      "parentId" : null,
+      "path" : "/[System] Staff/[System] Editors/[System] Senior",
+      "realmRoles" : null,
+      "subGroupCount" : 0,
+      "subGroups" : [ ]
+    } ]
+  } ]
+} ]

@@ -28,6 +28,7 @@ import org.keycloak.representations.idm.ClientScopeRepresentation;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.IdentityProviderMapperRepresentation;
 import org.keycloak.representations.idm.IdentityProviderRepresentation;
+import org.keycloak.representations.idm.MappingsRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RequiredActionProviderRepresentation;
@@ -174,15 +175,48 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
     return userRepresentation;
   }
 
-  static void enrichWithRealmRoles(GroupRepresentation group, RealmManager realmManager) {
-    List<String> realmRoles =
-        realmManager.getGroupResource(group.getId()).roles().realmLevel().listAll().stream()
-            .map(RoleRepresentation::getName)
-            .sorted()
-            .toList();
-    // Keycloak leaves the field unset for groups without roles; keep that shape, since existing
+  /** Sub-groups at every level, sorted, each with its realm and client role mappings. */
+  static List<GroupRepresentation> withSubGroupsAndRoles(
+      List<GroupRepresentation> groups, RealmManager realmManager) {
+    return groups.stream()
+        .peek(group -> enrichWithRoles(group, realmManager))
+        // Differs on every run, and the path already names the parent.
+        .peek(group -> group.setParentId(null))
+        .peek(
+            group ->
+                group.setSubGroups(
+                    // A group listing never fills subGroups.
+                    Objects.requireNonNullElse(group.getSubGroupCount(), 0L) == 0
+                        ? List.of()
+                        : withSubGroupsAndRoles(
+                            realmManager
+                                .getGroupResource(group.getId())
+                                .getSubGroups(0, Integer.MAX_VALUE, false),
+                            realmManager)))
+        .sorted(Comparator.comparing(GroupRepresentation::getName))
+        .toList();
+  }
+
+  static void enrichWithRoles(GroupRepresentation group, RealmManager realmManager) {
+    MappingsRepresentation mappings = realmManager.getGroupResource(group.getId()).roles().getAll();
+    List<String> realmRoles = sortedNames(mappings.getRealmMappings());
+    // Keycloak leaves the fields unset for groups without roles; keep that shape, since existing
     // validation files were written with it.
     group.setRealmRoles(realmRoles.isEmpty() ? null : realmRoles);
+    Map<String, List<String>> clientRoles = new TreeMap<>();
+    if (mappings.getClientMappings() != null) {
+      mappings
+          .getClientMappings()
+          .forEach(
+              (clientId, mapped) -> clientRoles.put(clientId, sortedNames(mapped.getMappings())));
+    }
+    group.setClientRoles(clientRoles.isEmpty() ? null : clientRoles);
+  }
+
+  private static List<String> sortedNames(List<RoleRepresentation> roles) {
+    return roles == null
+        ? List.of()
+        : roles.stream().map(RoleRepresentation::getName).sorted().toList();
   }
 
   static void enrichWithRealmComposites(
@@ -200,10 +234,22 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
     }
   }
 
+  /** Keyed by path, since sub-groups of different parents may share a name. */
   static Map<String, List<String>> getGroupMemberships(
       RealmManager realmManager, List<GroupRepresentation> sortedGroups) {
-    return sortedGroups.stream()
-        .collect(Collectors.toMap(GroupRepresentation::getName, getGroupMembers(realmManager)));
+    Map<String, List<String>> memberships = new TreeMap<>();
+    addGroupMemberships(realmManager, sortedGroups, memberships);
+    return memberships;
+  }
+
+  private static void addGroupMemberships(
+      RealmManager realmManager,
+      List<GroupRepresentation> groups,
+      Map<String, List<String>> memberships) {
+    for (GroupRepresentation group : groups) {
+      memberships.put(group.getPath(), getGroupMembers(realmManager).apply(group));
+      addGroupMemberships(realmManager, group.getSubGroups(), memberships);
+    }
   }
 
   static Function<GroupRepresentation, List<String>> getGroupMembers(RealmManager realmManager) {
@@ -370,10 +416,9 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
 
   default void validateGroups(RealmManager realmManager) {
     List<GroupRepresentation> sortedGroups =
-        realmManager.getGroupsResource().groups().stream()
-            .peek(group -> enrichWithRealmRoles(group, realmManager))
-            .sorted(Comparator.comparing(GroupRepresentation::getName))
-            .toList();
+        withSubGroupsAndRoles(
+            realmManager.getGroupsResource().groups(null, 0, Integer.MAX_VALUE, false),
+            realmManager);
     assertWithJsonFileWithSuffix(sortedGroups, idReplacer, "groups");
 
     Map<String, List<String>> groupMemberships = getGroupMemberships(realmManager, sortedGroups);
