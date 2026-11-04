@@ -13,7 +13,6 @@ import de.cronn.keycloak.provisioning.differ.ProtocolMapperDiffer;
 import de.cronn.keycloak.provisioning.differ.ToUpdate;
 import de.cronn.keycloak.provisioning.differ.UserProfileAttributeDiffer;
 import de.cronn.keycloak.provisioning.master.MasterRealmConfig;
-import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.core.Response;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -50,7 +49,6 @@ import org.keycloak.representations.idm.AuthenticationExecutionInfoRepresentatio
 import org.keycloak.representations.idm.AuthenticationFlowRepresentation;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
-import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.ProtocolMapperRepresentation;
 import org.keycloak.representations.idm.RealmRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
@@ -509,18 +507,6 @@ public class RealmManager {
         null,
         groupsResource::add);
     return changes.result();
-  }
-
-  /**
-   * The path is the group names joined by {@code /} with a leading one, e.g. {@code "/[System]
-   * Staff/Editors"}.
-   */
-  public Optional<GroupRepresentation> findGroupByPath(String path) {
-    try {
-      return Optional.of(getRealmResource().getGroupByPath(path));
-    } catch (NotFoundException e) {
-      return Optional.empty();
-    }
   }
 
   private void provisionClientScopeProtocolMappers(

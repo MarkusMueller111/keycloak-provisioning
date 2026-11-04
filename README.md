@@ -60,6 +60,8 @@ Maven:
   - [Client scopes](#-client-scopes)
   - [Groups](#-groups)
   - [Naming](#️-naming)
+- [On-demand changes](#-on-demand-changes)
+  - [On-demand groups](#-on-demand-groups)
 - [Test fixtures](#-test-fixtures)
 - [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
 - [Requirements](#-requirements)
@@ -534,8 +536,9 @@ realmManager.provisionManagedGroups(
                     .build())
             .build()));
 
-realmManager.findGroupByPath("/[System] Staff/[System] Editors")
-    .ifPresent(group -> userResource.joinGroup(group.getId()));
+GroupAdministration groups = new GroupAdministration(realmManager);
+groups.findGroupByPath("/[System] Staff/[System] Editors")
+    .ifPresent(group -> groups.addMember(group.getId(), userId));
 ```
 
 A group's declared realm and client roles are its full set of direct role mappings. The roles, and
@@ -548,7 +551,7 @@ the clients they belong to, have to exist before the groups that reference them.
 
 If you keep your groups as an enum, map it to `GroupConfig` in your own code; the enum stays the
 handle you use for memberships. Anything `GroupConfig` does not model is yours to change through
-`findGroupByPath` and `getRealmResource()` after provisioning.
+`GroupAdministration.findGroupByPath` and `getRealmResource()` after provisioning.
 
 ### 🏷️ Naming
 
@@ -590,6 +593,43 @@ new KeycloakDefaultConnectionConfig(
     new KeycloakProvisioningClientConfig("keycloak-provisioning", clientSecret),
     naming);
 ```
+
+## ⚡ On-demand changes
+
+Provisioning converges the realm on a fixed configuration. What appears while the application runs
+— a new customer, a new employee — is written through the on-demand classes instead. They take
+the same connection and the same `RealmManager`:
+
+```java
+GroupAdministration groups = new GroupAdministration(realmManager);
+```
+
+They only ever write objects **outside** the managed namespace, so provisioning never deletes what
+they create, and they refuse to touch anything provisioning owns. Every write is strict: creating
+something that exists, or changing something that does not, fails instead of falling back to the
+other. Each one is logged like a provisioning change.
+
+### 👪 On-demand groups
+
+```java
+String acme =
+    groups.createGroup(
+        GroupConfig.builder("Acme").attribute("customer-id", "42").realmRoles("reader").build());
+groups.createSubGroup(acme, GroupConfig.builder("Buyers").build());
+groups.addMember(acme, userId);
+
+groups.findGroupsByAttribute("customer-id", "42");
+```
+
+`updateGroup` matches a group by its id, so a new name renames it and its members stay. It leaves
+the sub-groups alone. `replaceGroupTree` also brings them to the declared ones and deletes any
+other, along with its memberships. Sub-groups are matched by name, so renaming one that way
+recreates it without its members. Find a group by an attribute of your own rather than by its name,
+which may change.
+
+Managed and unmanaged groups are never nested in each other: `createSubGroup` refuses a parent that
+is managed or lies within a managed group, where the new group would be deleted along with it.
+Memberships are references, not part of the tree, so users can join managed groups as well.
 
 ## ✅ Test fixtures
 
