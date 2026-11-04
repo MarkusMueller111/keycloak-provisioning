@@ -307,6 +307,18 @@ public interface KeycloakTestTraits extends JUnit5ValidationFileAssertions {
     assertWithJsonFileWithSuffix(clientScopes, keycloakValidationNormalizer(), "clientScopes");
   }
 
+  /** Leaves out the scopes Keycloak creates itself. */
+  default void validateCustomClientScopes(RealmManager realmManager) {
+    List<ClientScopeRepresentation> clientScopes =
+        realmManager.getRealmResource().clientScopes().findAll().stream()
+            .filter(scope -> !KeycloakProvidedClientScope.isKeycloakProvided(scope.getName()))
+            .sorted(Comparator.comparing(ClientScopeRepresentation::getName))
+            .peek(KeycloakTestTraits::sortProtocolMappers)
+            .toList();
+
+    assertWithJsonFileWithSuffix(clientScopes, keycloakValidationNormalizer(), "clientScopes");
+  }
+
   default void validateUserProfile(RealmManager realmManager) {
     UPConfig configuration =
         realmManager.getRealmResource().users().userProfile().getConfiguration();

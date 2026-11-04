@@ -658,6 +658,10 @@ security defaults, wildcard checks and scope rules, its scope assignments and pr
 included. `updateClient` matches by `clientId`. Keycloak's own clients and the provisioning client
 are refused; configure the former with `provisionBuiltInClients`.
 
+`ClientScopeAdministration` does the same for client scopes, matched by name, and refuses
+Keycloak's own scopes such as `profile` or `roles`. Deleting a scope also removes it from every
+client it is assigned to.
+
 ## ✅ Test fixtures
 
 The `testFixtures` artifact provides `KeycloakTestTraits`, a mixin interface whose `validate*`
@@ -690,7 +694,8 @@ validation files so they stay stable across environments. Add your own normalize
 
 `validateFlows` covers every flow in the realm, including Keycloak's own, which makes for a large
 file before you add any of your own — `validateCustomFlows` asserts only the flows you provisioned.
-`validateCustomClients` likewise leaves out Keycloak's own clients.
+`validateCustomClients` and `validateCustomClientScopes` likewise leave out Keycloak's own clients and
+client scopes.
 
 `validateGroups` writes the whole group tree, each group with its realm and client role mappings,
 and a second file with the members of every group, keyed by its path.

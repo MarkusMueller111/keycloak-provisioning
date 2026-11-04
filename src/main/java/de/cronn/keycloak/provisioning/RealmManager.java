@@ -467,6 +467,40 @@ public class RealmManager {
   public ProvisioningResult provisionManagedClientScopes(
       List<ClientScopeRepresentation> clientScopes) {
     clientScopes.forEach(this::assertClientScopeIsManaged);
+    return provisionClientScopes(clientScopes, clientNaming::isManaged, new HashMap<>());
+  }
+
+  /** Scoped to its own name, like {@link #createOrUpdateUnmanagedClient}. */
+  ProvisioningResult createOrUpdateUnmanagedClientScope(ClientScopeRepresentation clientScope) {
+    String name = clientScope.getName();
+    return provisionUnmanagedClientScope(
+        clientScope, existing -> name.equals(existing.getName()), new HashMap<>());
+  }
+
+  /** Returns the new scope's id. Fails with a conflict if the scope exists. */
+  String createUnmanagedClientScope(ClientScopeRepresentation clientScope) {
+    Map<String, String> createdIdsByName = new HashMap<>();
+    provisionUnmanagedClientScope(clientScope, existing -> false, createdIdsByName);
+    return createdIdsByName.get(clientScope.getName());
+  }
+
+  private ProvisioningResult provisionUnmanagedClientScope(
+      ClientScopeRepresentation clientScope,
+      Predicate<ClientScopeRepresentation> existingScopesToConsider,
+      Map<String, String> createdIdsByName) {
+    Validate.isTrue(
+        !clientNaming.isManaged(clientScope),
+        "Client scope '%s' carries the managed prefix '%s' and belongs in"
+            + " provisionManagedClientScopes",
+        clientScope.getName(),
+        clientNaming.prefix(ManagedNaming.ManagedEntity.CLIENT_SCOPE));
+    return provisionClientScopes(List.of(clientScope), existingScopesToConsider, createdIdsByName);
+  }
+
+  private ProvisioningResult provisionClientScopes(
+      List<ClientScopeRepresentation> clientScopes,
+      Predicate<ClientScopeRepresentation> existingScopesToConsider,
+      Map<String, String> createdIdsByName) {
     clientScopes.forEach(RealmManager::assertClientScopeProtocolIsDeclared);
     clientScopes.forEach(
         scope -> assertMapperProtocolsAreDeclared(scope.getProtocolMappers(), scope.getName()));
@@ -474,7 +508,7 @@ public class RealmManager {
 
     ClientScopesResource scopesResource = getRealmResource().clientScopes();
     List<ClientScopeRepresentation> existingScopes =
-        scopesResource.findAll().stream().filter(clientNaming::isManaged).toList();
+        scopesResource.findAll().stream().filter(existingScopesToConsider).toList();
 
     ClientScopeRepresentationDiffer differ =
         new ClientScopeRepresentationDiffer(existingScopes, clientScopes);
@@ -483,6 +517,7 @@ public class RealmManager {
       changes.added(Target.CLIENT_SCOPE, scope.getName());
       try (Response response = scopesResource.create(scope)) {
         assertResponseIs201Created(response);
+        createdIdsByName.put(scope.getName(), CreatedResponseUtil.getCreatedId(response));
       }
     }
     for (ClientScopeRepresentation scope : differ.getElementsToDelete()) {
