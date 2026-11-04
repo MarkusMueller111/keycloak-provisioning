@@ -1,0 +1,20 @@
+[ {
+  "attributes" : { },
+  "description" : null,
+  "id" : "[id]",
+  "name" : "acme",
+  "protocol" : "openid-connect",
+  "protocolMappers" : [ {
+    "config" : {
+      "access.token.claim" : "true",
+      "claim.name" : "tenant",
+      "claim.value" : "42"
+    },
+    "consentRequired" : false,
+    "consentText" : null,
+    "id" : "[id]",
+    "name" : "tenant",
+    "protocol" : "openid-connect",
+    "protocolMapper" : "oidc-hardcoded-claim-mapper"
+  } ]
+} ]
