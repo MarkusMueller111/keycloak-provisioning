@@ -88,6 +88,8 @@ differently depending on where it is sent:
   update is the exception: a `null` description clears it, and its attributes are replaced as a
   whole.
 - A group's `realmRoles` are ignored on create, and a group listing never fills `subGroups`.
+- A user's `serviceAccountClientId` is never filled in, so a service account is only recognizable
+  from its client's side.
 - A client's attributes and flow-binding overrides are merged on update: a key left out keeps its
   value, and one sent as `""` is removed. A client scope's attributes cannot be removed at all —
   `""` is stored as `""`. A realm attribute left out of the update is removed.

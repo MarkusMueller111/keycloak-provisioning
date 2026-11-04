@@ -9,7 +9,7 @@ import java.util.Map;
 import org.keycloak.representations.idm.UserRepresentation;
 
 public class UserRepresentationDiffer extends AbstractDiffer<UserRepresentation> {
-  private static PropertyUpdater<UserRepresentation> userRepresentationUpdater() {
+  public static PropertyUpdater<UserRepresentation> updater() {
     return (target, source) -> {
       target.setUsername(source.getUsername());
       target.setFirstName(orUnset(source.getFirstName(), target.getFirstName()));
@@ -23,13 +23,12 @@ public class UserRepresentationDiffer extends AbstractDiffer<UserRepresentation>
       // An update replaces the attributes the user profile manages, so {} removes them all.
       target.setAttributes(orDefault(source.getAttributes(), target.getAttributes(), Map.of()));
       // Credentials are left out: Keycloak never returns their value, so a diff could not see a
-      // change. FixedUserListProvisioner applies them separately whenever a desired user carries
-      // any.
+      // change, so they are set through the reset-password endpoint instead.
     };
   }
 
   public UserRepresentationDiffer(
       List<UserRepresentation> target, List<UserRepresentation> source) {
-    super(target, source, userRepresentationUpdater(), UserRepresentation::getUsername);
+    super(target, source, updater(), UserRepresentation::getUsername);
   }
 }
