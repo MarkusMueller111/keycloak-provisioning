@@ -12,6 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -74,16 +75,24 @@ public class AbstractDiffer<T> {
   }
 
   private void addUpdateElementIfDiff(T targetElement, T sourceElement) {
-    String oldStateAsJson = toJson(targetElement);
-    updater.update(targetElement, sourceElement);
-    String newStateAsJson = toJson(targetElement);
+    compare(targetElement, sourceElement, updater)
+        .ifPresentOrElse(elementsToUpdate::add, () -> elementsUnmodified.add(targetElement));
+  }
 
-    if (!Objects.equals(oldStateAsJson, newStateAsJson)) {
-      String diff = Differ.calculateMultilineDiff(oldStateAsJson, newStateAsJson);
-      elementsToUpdate.add(new ToUpdate<>(targetElement, diff));
-    } else {
-      elementsUnmodified.add(targetElement);
+  /**
+   * Applies {@code updater} to {@code current} in place, for an object matched by something other
+   * than its name, so that a rename is an update rather than a delete and an add.
+   */
+  public static <T> Optional<ToUpdate<T>> compare(
+      T current, T desired, PropertyUpdater<T> updater) {
+    String oldStateAsJson = toJson(current);
+    updater.update(current, desired);
+    String newStateAsJson = toJson(current);
+    if (Objects.equals(oldStateAsJson, newStateAsJson)) {
+      return Optional.empty();
     }
+    return Optional.of(
+        new ToUpdate<>(current, Differ.calculateMultilineDiff(oldStateAsJson, newStateAsJson)));
   }
 
   private static <T> Set<String> intersectKeys(Map<String, T> targetMap, Map<String, T> sourceMap) {

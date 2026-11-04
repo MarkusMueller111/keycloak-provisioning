@@ -166,20 +166,6 @@ class GroupProvisioningTest extends SharedKeycloakTest {
   }
 
   @Test
-  void findsANestedGroupByPath() {
-    withRealmManager(rm -> rm.provisionManagedGroups(List.of(staffTree())));
-
-    withRealmManager(
-        rm -> {
-          assertThat(rm.findGroupByPath(path("Staff", "Editors", "Senior")))
-              .get()
-              .extracting(GroupRepresentation::getName)
-              .isEqualTo(name("Senior"));
-          assertThat(rm.findGroupByPath(path("Staff", "Nobody"))).isEmpty();
-        });
-  }
-
-  @Test
   void rejectsASubGroupWithoutThePrefix() {
     GroupConfig unprefixed =
         GroupConfig.builder(name("Staff"))

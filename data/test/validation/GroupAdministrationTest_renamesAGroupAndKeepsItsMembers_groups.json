@@ -1,0 +1,19 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : { },
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "Acme Corp",
+  "parentId" : null,
+  "path" : "/Acme Corp",
+  "realmRoles" : null,
+  "subGroupCount" : 0,
+  "subGroups" : [ ]
+} ]

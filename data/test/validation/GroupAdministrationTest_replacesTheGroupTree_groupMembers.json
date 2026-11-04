@@ -1,0 +1,6 @@
+{
+  "/Acme Corp" : [ ],
+  "/Acme Corp/Buyers" : [ "alice" ],
+  "/Acme Corp/Partners" : [ ],
+  "/Acme Corp/Partners/Resellers" : [ ]
+}

@@ -13,7 +13,7 @@ import org.apache.commons.lang3.Validate;
  *
  * <p>Modelled here rather than as Keycloak's {@code GroupRepresentation}, which ignores {@code
  * realmRoles} on create and never fills {@code subGroups} when read. For anything not covered, use
- * {@link RealmManager#findGroupByPath(String)} and {@link RealmManager#getRealmResource()}.
+ * {@link GroupAdministration#findGroupByPath(String)} and {@link RealmManager#getRealmResource()}.
  *
  * @param name has to carry the group prefix of the {@link ManagedNaming}, at every level
  * @param description {@code null} means none

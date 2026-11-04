@@ -9,7 +9,7 @@ import org.keycloak.representations.idm.GroupRepresentation;
  */
 public class GroupRepresentationDiffer extends AbstractDiffer<GroupRepresentation> {
 
-  private static PropertyUpdater<GroupRepresentation> groupRepresentationUpdater() {
+  public static PropertyUpdater<GroupRepresentation> updater() {
     return (target, source) -> {
       target.setName(source.getName());
       // Unlike most fields, an update clears the description when sent null.
@@ -21,6 +21,6 @@ public class GroupRepresentationDiffer extends AbstractDiffer<GroupRepresentatio
 
   public GroupRepresentationDiffer(
       List<GroupRepresentation> target, List<GroupRepresentation> source) {
-    super(target, source, groupRepresentationUpdater(), GroupRepresentation::getName);
+    super(target, source, updater(), GroupRepresentation::getName);
   }
 }

@@ -1,0 +1,37 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : { },
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "Acme",
+  "parentId" : null,
+  "path" : "/Acme",
+  "realmRoles" : [ "reader" ],
+  "subGroupCount" : 1,
+  "subGroups" : [ {
+    "access" : {
+      "view" : true,
+      "viewMembers" : true,
+      "manageMembers" : true,
+      "manage" : true,
+      "manageMembership" : true
+    },
+    "attributes" : { },
+    "clientRoles" : null,
+    "description" : null,
+    "id" : "[id]",
+    "name" : "Buyers",
+    "parentId" : null,
+    "path" : "/Acme/Buyers",
+    "realmRoles" : [ "writer" ],
+    "subGroupCount" : 0,
+    "subGroups" : [ ]
+  } ]
+} ]

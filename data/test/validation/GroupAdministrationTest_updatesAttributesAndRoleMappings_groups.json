@@ -1,0 +1,21 @@
+[ {
+  "access" : {
+    "view" : true,
+    "viewMembers" : true,
+    "manageMembers" : true,
+    "manage" : true,
+    "manageMembership" : true
+  },
+  "attributes" : {
+    "tenant" : [ "2" ]
+  },
+  "clientRoles" : null,
+  "description" : null,
+  "id" : "[id]",
+  "name" : "Acme",
+  "parentId" : null,
+  "path" : "/Acme",
+  "realmRoles" : [ "writer" ],
+  "subGroupCount" : 0,
+  "subGroups" : [ ]
+} ]

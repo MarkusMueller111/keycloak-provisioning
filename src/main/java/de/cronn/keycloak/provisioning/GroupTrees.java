@@ -56,9 +56,10 @@ final class GroupTrees {
 
   /**
    * Diffs one level of the tree by name and recurses into the declared groups. Of the existing
-   * sub-groups only those on this side of the fence are diffed.
+   * sub-groups only those on this side of the fence are diffed. Returns the ids of this level's
+   * declared groups by name.
    */
-  void provision(
+  Map<String, String> provision(
       List<GroupRepresentation> existingGroups,
       List<GroupConfig> groups,
       String parentPath,
@@ -101,6 +102,7 @@ final class GroupTrees {
           path,
           groupResource::subGroup);
     }
+    return idsByName;
   }
 
   List<GroupRepresentation> onThisSide(List<GroupRepresentation> groups) {
