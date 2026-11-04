@@ -1,11 +1,13 @@
 package de.cronn.keycloak.provisioning;
 
+import java.util.Locale;
 import java.util.Objects;
 import org.apache.commons.lang3.Validate;
 import org.keycloak.representations.idm.ClientRepresentation;
 import org.keycloak.representations.idm.ClientScopeRepresentation;
 import org.keycloak.representations.idm.GroupRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
 
 /**
  * How this library names the objects it manages. The prefix is a deletion fence: the provisioning
@@ -25,11 +27,13 @@ public final class ManagedNaming {
   public static final String STANDARD_GROUP_PREFIX = "[System] ";
   public static final String STANDARD_ROLE_PREFIX = "system-";
   public static final String STANDARD_CLIENT_SCOPE_PREFIX = "system-";
+  public static final String STANDARD_USER_PREFIX = "system-";
 
   private final String clientPrefix;
   private final String groupPrefix;
   private final String rolePrefix;
   private final String clientScopePrefix;
+  private final String userPrefix;
   private final String provisioningClientId;
 
   private ManagedNaming(
@@ -37,12 +41,20 @@ public final class ManagedNaming {
       String groupPrefix,
       String rolePrefix,
       String clientScopePrefix,
+      String userPrefix,
       String provisioningClientId) {
     this.clientPrefix = Validate.notBlank(clientPrefix, "client prefix must not be blank");
     this.groupPrefix = Validate.notBlank(groupPrefix, "group prefix must not be blank");
     this.rolePrefix = Validate.notBlank(rolePrefix, "role prefix must not be blank");
     this.clientScopePrefix =
         Validate.notBlank(clientScopePrefix, "client scope prefix must not be blank");
+    Validate.notBlank(userPrefix, "user prefix must not be blank");
+    // Keycloak stores usernames lower-cased, so an upper-case prefix would never match.
+    Validate.isTrue(
+        userPrefix.equals(userPrefix.toLowerCase(Locale.ROOT)),
+        "user prefix must be lower-case, but was '%s'",
+        userPrefix);
+    this.userPrefix = userPrefix;
     this.provisioningClientId = provisioningClientId;
   }
 
@@ -52,6 +64,7 @@ public final class ManagedNaming {
         STANDARD_GROUP_PREFIX,
         STANDARD_ROLE_PREFIX,
         STANDARD_CLIENT_SCOPE_PREFIX,
+        STANDARD_USER_PREFIX,
         null);
   }
 
@@ -60,8 +73,13 @@ public final class ManagedNaming {
    * a technical client prefix there produces names nobody wants to read.
    */
   public static ManagedNaming custom(
-      String clientPrefix, String groupPrefix, String rolePrefix, String clientScopePrefix) {
-    return new ManagedNaming(clientPrefix, groupPrefix, rolePrefix, clientScopePrefix, null);
+      String clientPrefix,
+      String groupPrefix,
+      String rolePrefix,
+      String clientScopePrefix,
+      String userPrefix) {
+    return new ManagedNaming(
+        clientPrefix, groupPrefix, rolePrefix, clientScopePrefix, userPrefix, null);
   }
 
   /**
@@ -75,6 +93,7 @@ public final class ManagedNaming {
         groupPrefix,
         rolePrefix,
         clientScopePrefix,
+        userPrefix,
         Validate.notBlank(provisioningClientId, "provisioning client id must not be blank"));
   }
 
@@ -92,6 +111,10 @@ public final class ManagedNaming {
 
   public ManagedName clientScopeName(String clientScopeName) {
     return name(ManagedEntity.CLIENT_SCOPE, clientScopeName);
+  }
+
+  public ManagedName username(String username) {
+    return name(ManagedEntity.USER, username);
   }
 
   /**
@@ -115,6 +138,10 @@ public final class ManagedNaming {
     return isManaged(ManagedEntity.CLIENT_SCOPE, clientScope.getName());
   }
 
+  public boolean isManaged(UserRepresentation user) {
+    return isManaged(ManagedEntity.USER, user.getUsername());
+  }
+
   /** For the cases where only the name is at hand; prefer the representation overloads. */
   public boolean isManaged(ManagedEntity entity, String name) {
     Objects.requireNonNull(name);
@@ -134,6 +161,7 @@ public final class ManagedNaming {
       case GROUP -> groupPrefix;
       case ROLE -> rolePrefix;
       case CLIENT_SCOPE -> clientScopePrefix;
+      case USER -> userPrefix;
     };
   }
 
@@ -153,6 +181,7 @@ public final class ManagedNaming {
     CLIENT,
     GROUP,
     ROLE,
-    CLIENT_SCOPE
+    CLIENT_SCOPE,
+    USER
   }
 }

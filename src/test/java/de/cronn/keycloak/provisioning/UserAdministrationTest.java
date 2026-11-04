@@ -53,6 +53,23 @@ class UserAdministrationTest extends SharedKeycloakTest {
   }
 
   @Test
+  void refusesAPrefixedUsername() {
+    assertThatThrownBy(() -> withAdministration(users -> users.createUser(user("system-alice"))))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("managed prefix");
+  }
+
+  @Test
+  void refusesToChangeOrDeleteAManagedUser() {
+    withRealmManager(rm -> rm.provisionManagedUsers(List.of(user("system-alice"))));
+    String id = realm().users().searchByUsername("system-alice", true).getFirst().getId();
+
+    assertThatThrownBy(() -> withAdministration(users -> users.deleteUser(id)))
+        .isInstanceOf(KeycloakException.class)
+        .hasMessageContaining("managed prefix");
+  }
+
+  @Test
   void refusesAMixedCaseUsername() {
     assertThatThrownBy(() -> withAdministration(users -> users.createUser(user("Alice"))))
         .isInstanceOf(IllegalArgumentException.class)

@@ -59,13 +59,13 @@ Maven:
   - [Client hardening](#️-client-hardening)
   - [Client scopes](#-client-scopes)
   - [Groups](#-groups)
+  - [Users](#-users)
   - [Naming](#️-naming)
 - [On-demand changes](#-on-demand-changes)
   - [On-demand groups](#-on-demand-groups)
   - [On-demand users](#-on-demand-users)
   - [On-demand clients and client scopes](#-on-demand-clients-and-client-scopes)
 - [Test fixtures](#-test-fixtures)
-- [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
 - [Requirements](#-requirements)
 - [Related Projects](#-related-projects)
 
@@ -382,7 +382,7 @@ connection is opened.
 | `provisionBuiltInClients` | resets every client Keycloak provides that is not in the list to its hardened default, which for `broker` and `admin-cli` means disabled |
 | `provisionManagedClientScopes` | deletes every client scope whose name carries the prefix and is not in the list                                                          |
 | `provisionManagedGroups` | deletes every group whose name carries the prefix and is not in the list, at every level of the tree                               |
-| `FixedUserListProvisioner.provisionFixedUserList` | deletes **every user in the realm** that is not in the list — see [below](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner) |
+| `provisionManagedUsers` | deletes every user whose username carries the prefix and is not in the list                                                            |
 
 ### 🔐 Authentication flows
 
@@ -555,6 +555,27 @@ If you keep your groups as an enum, map it to `GroupConfig` in your own code; th
 handle you use for memberships. Anything `GroupConfig` does not model is yours to change through
 `GroupAdministration.findGroupByPath` and `getRealmResource()` after provisioning.
 
+### 🧑 Users
+
+`provisionManagedUsers` provisions the users whose username carries the prefix — technical
+accounts, test users, a fixed set of administrators. Everyone else, whether they signed up, came
+through an identity provider or were created with `UserAdministration`, is never touched. Only
+users whose username contains the prefix are read from Keycloak, so a realm with many other users
+is not loaded in full.
+
+```java
+realmManager.provisionManagedUsers(List.of(user)); // user.getUsername(): naming.username("ops").value()
+```
+
+The prefix has to be lower-case, as Keycloak stores usernames that way. Memberships are not part of
+a provisioned user; grant them through `GroupAdministration`.
+
+A declared password is set again on every run rather than diffed, which also restores one changed
+in the admin console: Keycloak never returns its value, so there is no way to tell whether it still
+matches. A temporary password therefore asks for a new one after every run. Only passwords are
+supported, and provisioning refuses a realm whose password policy contains `passwordHistory` or
+`passwordAge`, as both reject setting the current password again.
+
 ### 🏷️ Naming
 
 `provisionManagedClients` only ever deletes clients carrying the configured prefix, which is what
@@ -565,13 +586,13 @@ keeps it away from anything you did not provision.
 > provisioned under the old prefix and pulls unrelated objects into scope for deletion.
 
 > [!WARNING]
-> The prefix fences clients, client scopes and groups — **not flows or users**. `provisionFlows` is bounded
-> by Keycloak's own built-in flag, so every flow it did not create is in scope, including ones made
-> by hand in the admin console. `provisionFixedUserList` has no fence at all.
+> The prefix fences clients, client scopes, groups and users — **not flows**. `provisionFlows` is
+> bounded by Keycloak's own built-in flag, so every flow it did not create is in scope, including
+> ones made by hand in the admin console.
 
 ```java
-ManagedNaming.standard()                                     // clients, groups, roles, scopes
-ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-")
+ManagedNaming.standard()                                     // clients, groups, roles, scopes, users
+ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-", "acme-")
 ```
 
 Groups get `[System] ` rather than `system-` because their names are shown to people in the admin
@@ -587,7 +608,7 @@ this library one realm at a time keeps the id its other code authenticates with.
 A connection passes its naming to every `RealmManager` it creates, so the two cannot disagree:
 
 ```java
-ManagedNaming naming = ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-");
+ManagedNaming naming = ManagedNaming.custom("acme-", "[Acme] ", "acme-", "acme-", "acme-");
 
 new KeycloakDefaultConnectionConfig(
     serverUrl,
@@ -712,29 +733,6 @@ authenticate against the realm as your configuration leaves it.
 > `{"error":"invalid_grant","error_description":"Account is not fully set up"}`. Connect via the
 > provisioning client, via an admin that has an email address, or with a user profile that does not
 > require one.
-
-## 👥 Provisioning a fixed user list with `FixedUserListProvisioner`
-
-User provisioning lives in `FixedUserListProvisioner` rather than on `RealmManager`, because it
-only holds for a realm whose user list is fixed: nobody signs up, and no identity provider adds
-accounts.
-
-```java
-new FixedUserListProvisioner(realmManager).provisionFixedUserList(List.of(user));
-```
-
-A realm that gains users any other way will have them deleted on the next run.
-
-> [!CAUTION]
-> Users carry no naming prefix, so this is the one provisioning method with no fence at all: every
-> account in the realm that is not in your list is deleted. Service accounts are unaffected, as
-> Keycloak keeps them out of the user listing.
-
-A declared password is set again on every run rather than diffed, which also restores one changed
-in the admin console: Keycloak never returns its value, so there is no way to tell whether it still
-matches. A temporary password therefore asks for a new one after every run. Only passwords are
-supported, and provisioning refuses a realm whose password policy contains `passwordHistory` or
-`passwordAge`, as both reject setting the current password again.
 
 ## 📋 Requirements
 

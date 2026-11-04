@@ -17,8 +17,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Creates, changes and deletes users on demand, e.g. while the application runs. Memberships are
- * granted through {@link GroupAdministration}.
+ * Creates, changes and deletes users on demand, e.g. while the application runs. Only users outside
+ * the managed namespace can be written. Memberships are granted through {@link
+ * GroupAdministration}.
  *
  * <p>Every write is strict: creating a user that exists, or changing one that does not, fails
  * rather than falling back to the other. Usernames and emails have to be lower-case — see {@link
@@ -106,8 +107,9 @@ public final class UserAdministration {
     realmManager.getUserResource(userId).resetPassword(credential);
   }
 
-  private static void requireValid(UserRepresentation user) {
+  private void requireValid(UserRepresentation user) {
     UserFields.requireLowerCaseUsername(user.getUsername());
+    requireUnmanaged(user);
     UserFields.requireLowerCaseEmail(user.getEmail());
     UserFields.requireNoMembershipsDeclared(user);
   }
@@ -121,6 +123,7 @@ public final class UserAdministration {
     } catch (NotFoundException e) {
       throw new KeycloakException("No user with id '" + userId + "'", e);
     }
+    requireUnmanaged(user);
     if (isServiceAccount(user)) {
       throw new KeycloakException(
           "User '"
@@ -129,6 +132,18 @@ public final class UserAdministration {
               + " changed on its own");
     }
     return user;
+  }
+
+  private void requireUnmanaged(UserRepresentation user) {
+    ManagedNaming naming = realmManager.naming();
+    if (naming.isManaged(user)) {
+      throw new KeycloakException(
+          "User '"
+              + user.getUsername()
+              + "' carries the managed prefix '"
+              + naming.prefix(ManagedNaming.ManagedEntity.USER)
+              + "' and is written by provisioning only");
+    }
   }
 
   /**

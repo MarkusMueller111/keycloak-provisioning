@@ -108,18 +108,16 @@ class RequestResponseLoggingTest extends SharedKeycloakTest {
     logger.setLevel(Level.TRACE);
 
     UserRepresentation user = new UserRepresentation();
-    user.setUsername("logged-user");
+    user.setUsername("system-logged-user");
     user.setEnabled(true);
-    user.setEmail("logged-user@example.com");
+    user.setEmail("system-logged-user@example.com");
     CredentialRepresentation password = new CredentialRepresentation();
     password.setType(CredentialRepresentation.PASSWORD);
     password.setValue("Str0ng-P4ssw0rd!");
     password.setTemporary(false);
     user.setCredentials(List.of(password));
 
-    withRealmManager(
-        realmManager ->
-            new FixedUserListProvisioner(realmManager).provisionFixedUserList(List.of(user)));
+    withRealmManager(realmManager -> realmManager.provisionManagedUsers(List.of(user)));
 
     assertThat(messages()).noneMatch(message -> message.contains("Str0ng-P4ssw0rd!"));
   }
