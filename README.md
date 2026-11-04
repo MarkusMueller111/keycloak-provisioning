@@ -63,6 +63,7 @@ Maven:
 - [On-demand changes](#-on-demand-changes)
   - [On-demand groups](#-on-demand-groups)
   - [On-demand users](#-on-demand-users)
+  - [On-demand clients and client scopes](#-on-demand-clients-and-client-scopes)
 - [Test fixtures](#-test-fixtures)
 - [Provisioning a fixed user list with `FixedUserListProvisioner`](#-provisioning-a-fixed-user-list-with-fixeduserlistprovisioner)
 - [Requirements](#-requirements)
@@ -646,6 +647,17 @@ the value of a newly created user, so an undeclared `enabled` disables the accou
 through `GroupAdministration`; a user declaring `groups` or roles is refused, since Keycloak would
 ignore them. A client's service account cannot be changed or deleted on its own.
 
+### 🔌 On-demand clients and client scopes
+
+```java
+new ClientAdministration(realmManager).createClient(client);
+```
+
+A client is validated and written exactly as `provisionManagedClients` writes one — the same
+security defaults, wildcard checks and scope rules, its scope assignments and protocol mappers
+included. `updateClient` matches by `clientId`. Keycloak's own clients and the provisioning client
+are refused; configure the former with `provisionBuiltInClients`.
+
 ## ✅ Test fixtures
 
 The `testFixtures` artifact provides `KeycloakTestTraits`, a mixin interface whose `validate*`
@@ -678,6 +690,7 @@ validation files so they stay stable across environments. Add your own normalize
 
 `validateFlows` covers every flow in the realm, including Keycloak's own, which makes for a large
 file before you add any of your own — `validateCustomFlows` asserts only the flows you provisioned.
+`validateCustomClients` likewise leaves out Keycloak's own clients.
 
 `validateGroups` writes the whole group tree, each group with its realm and client role mappings,
 and a second file with the members of every group, keyed by its path.
