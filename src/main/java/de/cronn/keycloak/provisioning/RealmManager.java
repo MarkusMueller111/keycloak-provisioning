@@ -27,6 +27,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -454,8 +455,12 @@ public class RealmManager {
     clientDiffer.getElementsToDelete().forEach(client -> deleteClient(client, changes));
     clientDiffer.getElementsToUpdate().forEach(update -> updateClient(update, changes));
 
-    provisionClientScopeAssignments(clients, scopeIdsByName, changes);
-    provisionClientProtocolMappers(clients, changes);
+    Map<String, String> idsByClientId = new HashMap<>(createdIdsByClientId);
+    existingClients.forEach(client -> idsByClientId.put(client.getClientId(), client.getId()));
+    Function<String, ClientResource> clientById =
+        clientId -> getRealmResource().clients().get(idsByClientId.get(clientId));
+    provisionClientScopeAssignments(clients, clientById, scopeIdsByName, changes);
+    provisionClientProtocolMappers(clients, clientById, changes);
     return changes.result();
   }
 
@@ -723,19 +728,19 @@ public class RealmManager {
    * alone, an empty one removes every mapper. Keycloak returns mappers in its own order and with
    * ids of its own, so they are matched by name.
    */
-  private void provisionClientProtocolMappers(List<ClientRepresentation> clients, Changes changes) {
+  private void provisionClientProtocolMappers(
+      List<ClientRepresentation> clients,
+      Function<String, ClientResource> clientById,
+      Changes changes) {
     for (ClientRepresentation client : clients) {
       if (client.getProtocolMappers() == null) {
         continue;
       }
-      getClientByClientId(client.getClientId())
-          .ifPresent(
-              clientResource ->
-                  provisionProtocolMappers(
-                      clientResource.getProtocolMappers(),
-                      client.getProtocolMappers(),
-                      client.getClientId(),
-                      changes));
+      provisionProtocolMappers(
+          clientById.apply(client.getClientId()).getProtocolMappers(),
+          client.getProtocolMappers(),
+          client.getClientId(),
+          changes);
     }
   }
 
@@ -804,16 +809,17 @@ public class RealmManager {
    * An empty list removes every assignment.
    */
   private void provisionClientScopeAssignments(
-      List<ClientRepresentation> clients, Map<String, String> scopeIdsByName, Changes changes) {
+      List<ClientRepresentation> clients,
+      Function<String, ClientResource> clientById,
+      Map<String, String> scopeIdsByName,
+      Changes changes) {
     if (!declaresAnyClientScopes(clients)) {
       return;
     }
 
     for (ClientRepresentation client : clients) {
-      getClientByClientId(client.getClientId())
-          .ifPresent(
-              clientResource ->
-                  provisionClientScopes(clientResource, client, scopeIdsByName, changes));
+      provisionClientScopes(
+          clientById.apply(client.getClientId()), client, scopeIdsByName, changes);
     }
   }
 
