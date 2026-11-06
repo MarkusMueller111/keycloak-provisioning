@@ -249,7 +249,7 @@ public class RealmManager {
     refreshToken();
   }
 
-  public Optional<RealmRepresentation> getRealmIfExists() {
+  Optional<RealmRepresentation> getRealmIfExists() {
     return keycloak.realms().findAll().stream()
         .filter(realm -> realmName.equals(realm.getRealm()))
         .collect(StreamUtil.toSingleOptionalElement());
@@ -943,7 +943,7 @@ public class RealmManager {
     return getRealmResource().groups();
   }
 
-  public Optional<UserResource> getUserResourceByUsername(String username) {
+  Optional<UserResource> getUserResourceByUsername(String username) {
     RealmResource realm = getRealmResource();
     return getUserByUsername(username).map(user -> realm.users().get(user.getId()));
   }
@@ -952,17 +952,17 @@ public class RealmManager {
     return searchUsersByExactUsername(username).collect(StreamUtil.toSingleOptionalElement());
   }
 
-  public Stream<UserRepresentation> searchUsersByExactUsername(String username) {
+  Stream<UserRepresentation> searchUsersByExactUsername(String username) {
     RealmResource realm = getRealmResource();
     return realm.users().searchByUsername(username, true).stream();
   }
 
-  public List<UserRepresentation> getUsers(int maxResults) {
+  List<UserRepresentation> getUsers(int maxResults) {
     // getRealm().users().list() only returns 100 users per default
     return getRealmResource().users().list(null, maxResults);
   }
 
-  public List<RoleRepresentation> getRoles() {
+  List<RoleRepresentation> getRoles() {
     return getRealmResource().roles().list().stream()
         .sorted(Comparator.comparing(RoleRepresentation::getName))
         .toList();
@@ -993,7 +993,7 @@ public class RealmManager {
     return createUser(getRealmResource().users(), userRepresentation);
   }
 
-  public String createUser(UsersResource usersResource, UserRepresentation userRepresentation) {
+  private String createUser(UsersResource usersResource, UserRepresentation userRepresentation) {
     try (Response response = usersResource.create(userRepresentation)) {
       int status = response.getStatus();
       if (status == Response.Status.CONFLICT.getStatusCode()) {
@@ -1031,7 +1031,7 @@ public class RealmManager {
         .realmLevel();
   }
 
-  public Optional<ClientResource> getClientByClientId(String clientId) {
+  Optional<ClientResource> getClientByClientId(String clientId) {
     return getRealmResource().clients().findByClientId(clientId).stream()
         .collect(StreamUtil.toSingleOptionalElement())
         .map(ClientRepresentation::getId)
